@@ -1,0 +1,5 @@
+[
+  { "id": "supplier-1", "type": "entity", "value": "Example Demo Holdings Ltd" },
+  { "id": "supplier-2", "type": "entity", "value": "Some Other Company BV" },
+  { "id": "origin-1", "type": "country", "value": "NL" }
+]

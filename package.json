@@ -1,0 +1,30 @@
+{
+  "name": "al-muqarin",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Compares claims about a supply chain with public lists. Fail-closed. Not an audit.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "mutatie": "node tools/mutatie-proef.mjs",
+    "mutatie-zelftest": "node tools/mutatie-proef-zelftest.mjs"
+  },
+  "repository": "github:holistis/al-muqarin",
+  "files": [
+    "src",
+    "feeder",
+    "loket",
+    "tools",
+    "test",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "NOTICE",
+    "SECURITY.md",
+    "examples"
+  ]
+}
