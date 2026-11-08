@@ -87,11 +87,11 @@ describe('opdrachtregel: --min-volgnummer', () => {
 });
 
 describe('voeding: de keten in het logboek', () => {
-  const FEEDER = new URL('../feeder/fetch-eu-fsf.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+  const FEEDER = new URL('../feeder/voeding.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
   const out = join(root, 'f-snaps'), hist = join(root, 'f-hist'), keyFile = join(root, 'f-priv.pem');
   writeFileSync(keyFile, K.priv);
   const xml = (k, gen = '2026-11-05') => `<?xml version="1.0"?><export generationDate="${gen}T10:00:00.000+01:00">` + Array.from({ length: k }, (_, i) => `<sanctionEntity euReferenceNumber="EU.${i}" logicalId="${i}"><nameAlias wholeName="Name Number ${i} &amp; Co" logicalId="${i}"/></sanctionEntity>`).join('') + '</export>';
-  const feed = (name, content, now) => { const p = join(root, name); writeFileSync(p, content); return spawnSync('node', [FEEDER, '--out', out, '--history', hist, '--key', keyFile, '--from-file', p, '--floor', '5', '--now', now], { encoding: 'utf8' }); };
+  const feed = (name, content, now) => { const p = join(root, name); writeFileSync(p, content); return spawnSync('node', [FEEDER, '--bron', 'eu-fsf', '--out', out, '--history', hist, '--key', keyFile, '--from-file', p, '--floor', '5', '--now', now], { encoding: 'utf8' }); };
   const manifest = () => JSON.parse(readFileSync(join(out, 'eu-fsf', 'manifest.json'), 'utf8'));
   const ledger = () => readFileSync(join(hist, 'ledger.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
   it('the first run is number 1 with no predecessor; the next names the hash of the first manifest', () => {
@@ -162,7 +162,7 @@ describe('loket: weigert een oudere lijst nadat hij een nieuwere heeft gezien', 
 describe('alarm: de live lijst moet de laatste uit het logboek zijn', () => {
   const NU2 = new Date('2026-11-06T12:00:00Z');
   const GOOD = { fetchedAt: '2026-11-06T05:17:00Z', asOf: '2026-11-04' };
-  const status = (d) => bepaalStatus({ snapshotDir: join(d, 'snap'), historyDir: join(d, 'hist'), pubKeyPem: K.pub, now: NU2 });
+  const status = (d) => bepaalStatus({ bronnen: ['eu-fsf'], snapshotDir: join(d, 'snap'), historyDir: join(d, 'hist'), pubKeyPem: K.pub, now: NU2 }).bronnen['eu-fsf'];
   const maak = (manifest, ledgerRegels) => {
     const d = join(root, `st${n++}`); mkdirSync(join(d, 'hist'), { recursive: true });
     writeSnapshot(join(d, 'snap'), 'eu-fsf', ENTITIES, K.priv, { manifest: { ...GOOD, ...manifest } });

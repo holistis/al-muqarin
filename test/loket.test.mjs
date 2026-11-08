@@ -16,12 +16,14 @@ const servers = [];
 after(() => { for (const s of servers) { s.closeAllConnections?.(); s.close(); } cleanup(root); });
 let n = 0;
 const goodSnap = (o = {}) => { const d = join(root, `s${n++}`); writeSnapshot(d, 'eu-fsf', ENTITIES, K.priv, o); return d; };
+// The fixtures hold one entity list (eu-fsf) and the country list; a test of the default set says so with required: undefined.
+const EU = { entity: ['eu-fsf'], country: ['cahras'] };
 const FRESH = { manifest: { fetchedAt: '2026-11-05T10:00:00Z', asOf: '2026-11-05' } };
 
 async function start(o = {}) {
   const logs = [];
   const snapshotDir = o.snapshotDir ?? goodSnap(FRESH);
-  const srv = maakLoket({ snapshotDir, pubKeyPem: K.pub, privKeyPem: K.priv, klok, log: (l) => logs.push(l), ...o.opties, limieten: o.limieten });
+  const srv = maakLoket({ snapshotDir, pubKeyPem: K.pub, privKeyPem: K.priv, klok, log: (l) => logs.push(l), required: EU, ...o.opties, limieten: o.limieten });
   const a = await luister(srv, 0);
   servers.push(srv);
   return { srv, logs, snapshotDir, base: `http://127.0.0.1:${a.port}`, poort: a.port };
@@ -353,5 +355,20 @@ describe('loket: opstarten', () => {
       const e = await klaar;
       assert.ok(process.platform === 'win32' ? (e.code === 0 || e.sig === 'SIGTERM') : e.code === 0, JSON.stringify(e));
     }
+  });
+});
+
+describe('loket: de lijsten waarmee vergeleken wordt', () => {
+  it('compares with the lists it was started with: a clean name is GEEN_TREFFER_IN_LIJST when only the list that is there is asked', async () => {
+    reset(); const { base } = await start();
+    const j = await (await post(base, [claim('Unknown Firm')])).json();
+    assert.equal(j.report.resultaten[0].uitkomst, 'GEEN_TREFFER_IN_LIJST');
+    assert.deepEqual(j.report.bronnen.map((b) => b.bron), ['eu-fsf']);
+  });
+  it('without a choice it asks for the default set, so a clean name is ONMEETBAAR while a list is missing', async () => {
+    reset(); const { base } = await start({ opties: { required: undefined } });
+    const j = await (await post(base, [claim('Unknown Firm')])).json();
+    assert.equal(j.report.resultaten[0].uitkomst, 'ONMEETBAAR');
+    assert.deepEqual(j.report.bronnen.map((b) => b.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
   });
 });

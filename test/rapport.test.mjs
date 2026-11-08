@@ -8,13 +8,14 @@ import { keyId, runCheck, signReport, verifyReport } from '../src/check.mjs';
 import { sha256Hex } from '../src/snapshot.mjs';
 import { COUNTRIES, ENTITIES, NOW, cleanup, keypair, tmpRoot, writeSnapshot } from './fixture.mjs';
 
+const EU = { entity: ['eu-fsf'], country: ['cahras'] }; // the fixtures hold one entity list and the country list
 const K = keypair(); const OTHER = keypair();
 const root = tmpRoot();
 after(() => cleanup(root));
 writeSnapshot(root, 'eu-fsf', ENTITIES, K.priv);
 writeSnapshot(root, 'cahras', COUNTRIES, K.priv, { manifest: { minEntries: 1 } });
 const claims = [{ id: 'a', type: 'entity', value: 'Acme Trading' }, { id: 'b', type: 'entity', value: 'Completely Different Holdings' }, { id: 'c', type: 'country', value: 'NL' }, { id: 'd', type: 'entity', value: 'Acme Tradng' }];
-const rep = runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, klok: 'opgegeven' });
+const rep = runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, klok: 'opgegeven', required: EU });
 const good = signReport(rep, K.priv);
 // Signed correctly by our key, but the content is edited: the signature alone must not be enough.
 const signRaw = (obj) => ({ report: obj, handtekening: sign(null, Buffer.from(canonical(obj)), createPrivateKey(K.priv)).toString('base64') });
@@ -27,19 +28,19 @@ describe('report content', () => {
   });
   it('every result carries the hash of its own claim, also an invalid one', () => {
     claims.forEach((c, i) => assert.equal(good.report.resultaten[i].claim_sha256, sha256Hex(Buffer.from(canonical(c)))));
-    const bad = runCheck({ claims: [{ id: 'z' }], snapshotDir: root, pubKeyPem: K.pub, now: NOW });
+    const bad = runCheck({ claims: [{ id: 'z' }], snapshotDir: root, pubKeyPem: K.pub, now: NOW, required: EU });
     assert.equal(bad.resultaten[0].claim_sha256, sha256Hex(Buffer.from(canonical({ id: 'z' }))));
   });
   it('records the clock as stated and the maximum age used; the machine clock is the default', () => {
     assert.equal(good.report.klok, 'opgegeven'); assert.equal(good.report.max_leeftijd_dagen, 8);
-    assert.equal(runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, maxAgeDays: 5 }).max_leeftijd_dagen, 5);
-    assert.equal(runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW }).klok, 'systeem');
+    assert.equal(runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, maxAgeDays: 5, required: EU }).max_leeftijd_dagen, 5);
+    assert.equal(runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, required: EU }).klok, 'systeem');
   });
   it('has a plain sentence per outcome that names the list and date, and never says clean or safe', () => {
     const [treffer, geen, , kandidaat] = good.report.resultaten.map((r) => r.toelichting);
     assert.match(geen, /Niet gevonden in eu-fsf van 2026-11-05/); assert.match(geen, /eigenaren/);
     assert.match(treffer, /niet gecontroleerd/); assert.match(kandidaat, /Vergelijk zelf/);
-    const onm = runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: new Date('2027-06-01T00:00:00Z') }).resultaten[0].toelichting;
+    const onm = runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: new Date('2027-06-01T00:00:00Z'), required: EU }).resultaten[0].toelichting;
     assert.match(onm, /Niet gemeten/); assert.match(onm, /geen groen/);
     for (const t of [treffer, geen, kandidaat, onm]) assert.ok(!/schoon|veilig|clean|safe/i.test(t), t);
   });
@@ -84,7 +85,7 @@ describe('verify: a correct signature is not enough', () => {
     assert.equal(verifyReport(signReport(rep, OTHER.priv), OTHER.pub).ok, true);   // the signature alone proves only which key was used: that is what the key id is for
   });
   it('an unusable source is allowed (the outcome is then ONMEETBAAR) and does not break the date check', () => {
-    const r = runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: new Date('2027-06-01T00:00:00Z') });
+    const r = runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: new Date('2027-06-01T00:00:00Z'), required: EU });
     assert.ok(r.bronnen.some((b) => !b.bruikbaar));
     assert.equal(verifyReport(signReport(r, K.priv), K.pub).ok, true);
   });

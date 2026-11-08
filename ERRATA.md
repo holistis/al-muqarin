@@ -2,6 +2,10 @@
 
 Every miss or wrong answer we know about: what was missed, since which version, what was fixed. Newest first.
 
+## 2026-11-08, a claim in our own documents
+
+- `docs/KNOWN-LIMITS.md` said that transliteration between scripts is the main reason the alias test misses a party. That was not measured, and it was wrong: the alias test uses only names written in Latin letters (names in other scripts are not compared at all), so its misses cannot be transliteration between scripts. A hand sorting of a random sample of 36 of the 258 misses (seed 7, one sample, so rough) gave: about 4 in 10 are other Latin spellings of the same name (Alexandr / Alexander, Dmitry / Dmitrij, Mahamet / Mahamat), about 1 in 6 are company names written in another language, about 1 in 5 are an abbreviation or a shorter or longer form of the name (NIOC against National Iranian Oil Company), about 1 in 5 are another name of the same party that shares no word with the one asked, and 2 in 36 are a legal form our list of legal forms does not know ("Rt."). Corrected in `docs/KNOWN-LIMITS.md`.
+
 ## 2026-11-07, before the first release
 
 Found by our own reviews before anything was published, so no released version ever carried them (version 0.0.1 is the first release). They are listed because a reader should be able to see what kind of holes this tool had.

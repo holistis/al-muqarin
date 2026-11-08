@@ -6,7 +6,12 @@ import { loadSnapshot, sha256Hex } from './snapshot.mjs';
 
 export const VERSION = '0.0.1';
 export const MAX_CLAIMS = 200;
-export const REQUIRED = { entity: ['eu-fsf'], country: ['cahras'] };
+// The lists an entity claim can be compared with. A claim is checked against EVERY list in the set it is given, and a list that is
+// missing or refused makes that claim ONMEETBAAR unless another list found something worse. 'un-sc' is known but not in the default
+// set: the UN terms of use do not clearly allow this use (see docs/DESIGN.md), so whoever feeds it asks for it by name.
+export const ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'un-sc'];
+export const DEFAULT_ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn'];
+export const REQUIRED = { entity: DEFAULT_ENTITY_SOURCES, country: ['cahras'] };
 export const OUTCOMES = ['TREFFER', 'KANDIDAAT', 'ONMEETBAAR', 'GEEN_TREFFER_IN_LIJST'];
 const RANK = { TREFFER: 4, KANDIDAAT: 3, ONMEETBAAR: 2, GEEN_TREFFER_IN_LIJST: 1 };
 
@@ -24,6 +29,16 @@ const RARE_MAX = 25;
 export const MIN_DEKKING = 0.9;
 
 export class InvalidInput extends Error {}
+
+// "eu-fsf,uk-sanctions" to the set of lists to compare entity claims with. An unknown name, an empty one or a repeat is refused: a typo
+// must never shrink the set silently.
+export function kiesBronnen(tekst) {
+  const namen = String(tekst).split(',').map((s) => s.trim());
+  if (namen.some((n) => !ENTITY_SOURCES.includes(n)) || new Set(namen).size !== namen.length) {
+    throw new InvalidInput(`bronnen: kies uit ${ENTITY_SOURCES.join(', ')}, gescheiden door een komma, elk hooguit een keer`);
+  }
+  return { ...REQUIRED, entity: namen };
+}
 
 // Optimal string alignment distance: insert, delete, substitute and swap of two adjacent letters each cost 1.
 // Returns max + 1 as soon as the distance is certainly above `max` (checks the last two rows, because a swap looks two rows back).
@@ -127,8 +142,9 @@ export function collectHits(value, snap, threshold = 0.75, exclude = null) {
     }
     if (!reden && rareWord && ent.set.has(rareWord)) reden = 'enkel_woord';
     // The other way round: the listed name is one rare word and the claim contains it ("Alrosa Trading" vs "PJSC Alrosa").
-    // Not for persons: single first names or surnames in the list would flag almost every person name.
-    if (!reden && ent.soort !== 'persoon' && ent.set.size === 1 && ent.k.length >= 5 && set.has(ent.k) && (snap.freq.get(ent.k) ?? 0) <= RARE_MAX) reden = 'enkel_woord';
+    // Not for persons: single first names or surnames in the list would flag almost every person name. Nor for ships and aircraft (type
+    // 'voertuig'): a vessel called MARIA must not flag every claim with the word Maria in it.
+    if (!reden && (ent.soort === 'onderneming' || ent.soort === 'onbekend') && ent.set.size === 1 && ent.k.length >= 5 && set.has(ent.k) && (snap.freq.get(ent.k) ?? 0) <= RARE_MAX) reden = 'enkel_woord';
     if (!reden && coreSet) {
       const [s, l] = coreSet.size <= ent.set.size ? [coreSet, ent.set] : [ent.set, coreSet];
       if ((s.size >= 2 && [...s].every((t) => l.has(t))) || (rareCore && ent.set.has(rareCore))) reden = 'initiaal';
@@ -240,7 +256,9 @@ export const signReport = (report, privKeyPem) => {
 
 // Beyond the signature this re-checks that the report is consistent with itself, and (with `claims`) that it is about exactly these claims.
 // What it cannot prove: that the signer's clock was right, or that the signer ran the real code. Those need an outside timestamp / witness.
-export function verifyReport(obj, pubKeyPem, { claims, expect } = {}) {
+// `bronnen` (optional): the lists the reader demands for every claim about a company. A report that rests on fewer, more or other lists
+// does not verify, so a signed report that quietly asked for less is not accepted.
+export function verifyReport(obj, pubKeyPem, { claims, expect, bronnen } = {}) {
   try {
     if (obj === null || typeof obj !== 'object' || Object.keys(obj).sort().join() !== 'handtekening,report') return { ok: false, reden: 'vorm' };
     const pub = createPublicKey(pubKeyPem);
@@ -275,6 +293,13 @@ export function verifyReport(obj, pubKeyPem, { claims, expect } = {}) {
         const b = typeof p.bron === 'string' ? bronMap.get(p.bron) : undefined;
         if (!b) return { ok: false, reden: 'bron_onbekend' };
         if (p.uitkomst !== 'ONMEETBAAR' && !b.bruikbaar) return { ok: false, reden: 'bron_onbruikbaar' };
+      }
+    }
+    if (bronnen !== undefined) {
+      const verwacht = [...bronnen].sort().join();
+      // A claim that was refused rests on no list at all (its source is null) and says so in its outcome.
+      for (const x of r.resultaten) {
+        if (x.type === 'entity' && !x.per_bron.some((p) => p.bron === null) && x.per_bron.map((p) => p.bron).sort().join() !== verwacht) return { ok: false, reden: 'bronnen_niet_zoals_verwacht' };
       }
     }
     if (claims !== undefined) {

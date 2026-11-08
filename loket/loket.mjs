@@ -112,7 +112,7 @@ export function isLokaleHost(host) {
   return naam === '127.0.0.1' || naam === 'localhost' || naam === '[::1]';
 }
 
-export function maakLoket({ snapshotDir, pubKeyPem, privKeyPem, limieten = {}, klok = () => Date.now(), log = () => {}, vertrouwProxy = false, laad = loadSnapshot, ledgerPad = null }) {
+export function maakLoket({ snapshotDir, pubKeyPem, privKeyPem, limieten = {}, klok = () => Date.now(), log = () => {}, vertrouwProxy = false, laad = loadSnapshot, ledgerPad = null, required = undefined }) {
   const L = { ...STANDAARD, ...limieten };
   const pub = createPublicKey(pubKeyPem);
   const sleutelId = keyId(pubKeyPem);
@@ -164,7 +164,7 @@ export function maakLoket({ snapshotDir, pubKeyPem, privKeyPem, limieten = {}, k
     if (!g.ok) return { status: fout(res, 429, null, { 'retry-after': String(g.wachtSeconden) }), claims: claims.length };
     let rapport;
     try {
-      rapport = signReport(runCheck({ claims, snapshotDir, pubKeyPem, now: new Date(klok()), klok: 'systeem', maxAgeDays: L.maxAgeDagen, loadSnap }), privKeyPem);
+      rapport = signReport(runCheck({ claims, snapshotDir, pubKeyPem, now: new Date(klok()), klok: 'systeem', maxAgeDays: L.maxAgeDagen, loadSnap, required }), privKeyPem);
     } catch (e) {
       if (e instanceof InvalidInput) return { status: fout(res, 400, String(e.message).slice(0, 200)), claims: claims.length };
       throw e;

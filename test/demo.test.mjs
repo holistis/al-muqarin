@@ -28,7 +28,7 @@ describe('de proef van een minuut uit de README', () => {
   });
   it('the example claims give a hit, a no-match and an unmeasured answer, and the report verifies against them', () => {
     const rapport = join(root, 'rapport.json');
-    const c = spawnSync('node', [CLI, 'check', '--claims', CLAIMS, '--snapshots', join(dir, 'snapshots'), '--pub', join(dir, 'keys', 'muqarin-public.pem'), '--key', join(dir, 'keys', 'muqarin-private.pem'), '--out', rapport], { encoding: 'utf8' });
+    const c = spawnSync('node', [CLI, 'check', '--claims', CLAIMS, '--snapshots', join(dir, 'snapshots'), '--pub', join(dir, 'keys', 'muqarin-public.pem'), '--key', join(dir, 'keys', 'muqarin-private.pem'), '--out', rapport, '--bronnen', 'eu-fsf'], { encoding: 'utf8' });
     assert.equal(c.status, 22, c.stderr);
     const rep = JSON.parse(readFileSync(rapport, 'utf8')).report;
     assert.deepEqual(rep.resultaten.map((r) => r.uitkomst), ['TREFFER', 'GEEN_TREFFER_IN_LIJST', 'ONMEETBAAR']);

@@ -14,7 +14,9 @@ const servers = [];
 after(() => { for (const s of servers) { s.closeAllConnections?.(); s.close(); } cleanup(root); });
 const K = keypair();
 writeSnapshot(root, 'eu-fsf', ENTITIES, K.priv);
-const check = (claims, extra = {}) => runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, ...extra });
+// The fixtures of these tests hold one entity list (eu-fsf) and the country list; the set of lists is a plain argument.
+const EU = { entity: ['eu-fsf'], country: ['cahras'] };
+const check = (claims, extra = {}) => runCheck({ claims, snapshotDir: root, pubKeyPem: K.pub, now: NOW, required: EU, ...extra });
 const uitkomst = (value) => check([{ id: 'a', type: 'entity', value }]).resultaten[0].uitkomst;
 const gevonden = (value) => ['TREFFER', 'KANDIDAAT'].includes(uitkomst(value));
 const nietStil = (value) => uitkomst(value) !== 'GEEN_TREFFER_IN_LIJST';
@@ -69,7 +71,7 @@ describe('F2: onzichtbare tekens buiten de categorie Cf splitsen een woord niet'
     for (const ch of tekens) for (let p = 1; p < 5; p++) claims.push({ id: `u${ch.codePointAt(0).toString(16)}-${p}`, type: 'entity', value: 'Sibur'.slice(0, p) + ch + 'Sibur'.slice(p) });
     const fouten = [];
     for (let i = 0; i < claims.length; i += 200) {
-      const rep = runCheck({ claims: claims.slice(i, i + 200), snapshotDir: kort, pubKeyPem: K.pub, now: NOW });
+      const rep = runCheck({ claims: claims.slice(i, i + 200), snapshotDir: kort, pubKeyPem: K.pub, now: NOW, required: EU });
       for (const r of rep.resultaten) if (r.uitkomst === 'GEEN_TREFFER_IN_LIJST') fouten.push(r.id);
     }
     assert.deepEqual(fouten.slice(0, 10), []);
@@ -112,7 +114,7 @@ describe('F9: een minimum voor een onbekende bron is een fout, en het rapport ze
     assert.deepEqual(check([{ id: 'a', type: 'entity', value: 'Alrosa' }]).min_volgnummer, {});
     const d = join(root, 'keten2');
     writeSnapshot(d, 'eu-fsf', ENTITIES, K.priv, { manifest: { volgnummer: 5, vorige_manifest_sha256: 'a'.repeat(64) } });
-    const rep = runCheck({ claims: [{ id: 'a', type: 'entity', value: 'Alrosa' }], snapshotDir: d, pubKeyPem: K.pub, now: NOW, minVolgnummer: { 'eu-fsf': 5 } });
+    const rep = runCheck({ claims: [{ id: 'a', type: 'entity', value: 'Alrosa' }], snapshotDir: d, pubKeyPem: K.pub, now: NOW, minVolgnummer: { 'eu-fsf': 5 }, required: EU });
     assert.deepEqual(rep.min_volgnummer, { 'eu-fsf': 5 });
   });
   it('an unknown source in the minimum is refused by the library and by the command line', () => {
@@ -199,20 +201,21 @@ describe('F6 en F14: strikte JSON', () => {
     const d = join(root, 'dubbelmanifest'); writeSnapshot(d, 'eu-fsf', ENTITIES, K.priv);
     const p = join(d, 'eu-fsf', 'manifest.json');
     writeFileSync(p, readFileSync(p, 'utf8').replace('"schema":1', '"schema":1,"schema":1'));
-    const rep = runCheck({ claims: [{ id: 'a', type: 'entity', value: 'PJSC Alrosa' }], snapshotDir: d, pubKeyPem: K.pub, now: NOW });
+    const rep = runCheck({ claims: [{ id: 'a', type: 'entity', value: 'PJSC Alrosa' }], snapshotDir: d, pubKeyPem: K.pub, now: NOW, required: EU });
     assert.equal(rep.resultaten[0].uitkomst, 'ONMEETBAAR');
   });
 });
 
 describe('uitkomsten blijven één van de vier', () => {
-  it('sanity: the outcome list is unchanged and the known sources are the two the design names', () => {
+  it('sanity: the outcome list is unchanged and the known sources are the ones the design names (the UN list is known but not in the default set)', () => {
     assert.deepEqual(OUTCOMES, ['TREFFER', 'KANDIDAAT', 'ONMEETBAAR', 'GEEN_TREFFER_IN_LIJST']);
-    assert.deepEqual([...new Set(Object.values(REQUIRED).flat())].sort(), ['cahras', 'eu-fsf']);
+    assert.deepEqual([...new Set(Object.values(REQUIRED).flat())].sort(), ['cahras', 'eu-fsf', 'ofac-sdn', 'uk-sanctions']);
+    assert.ok(!Object.values(REQUIRED).flat().includes('un-sc'), 'the UN list is opt-in until its terms are clear');
   });
 });
 
 describe('F5: de voeding toetst inhoud, niet alleen aantal', () => {
-  const FEEDER = new URL('../feeder/fetch-eu-fsf.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+  const FEEDER = new URL('../feeder/voeding.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
   const sleutel = join(root, 'f5-priv.pem'); writeFileSync(sleutel, K.priv);
   const nieuw = () => { const d = join(root, `f5-${Math.random().toString(36).slice(2, 8)}`); mkdirSync(d); return { out: join(d, 's'), hist: join(d, 'h'), d }; };
   const xml = (ids, naam = (i) => `Name Number ${i} and Co`) => `<?xml version="1.0"?><export generationDate="2026-11-05T10:00:00.000+01:00">` + ids.map((i) => `<sanctionEntity euReferenceNumber="EU.${i}" logicalId="${i}"><nameAlias wholeName="${naam(i)}" logicalId="${i}"/></sanctionEntity>`).join('') + '</export>';
@@ -221,7 +224,7 @@ describe('F5: de voeding toetst inhoud, niet alleen aantal', () => {
   const feed = (w, inhoud, extra = []) => {
     const p = join(w.d, `in${teller}.xml`); writeFileSync(p, inhoud);
     const now = new Date(Date.parse('2026-11-06T05:00:00Z') + (teller++) * 3600000).toISOString();
-    return spawnSync('node', [FEEDER, '--out', w.out, '--history', w.hist, '--key', sleutel, '--from-file', p, '--floor', '5', '--now', now, ...extra], { encoding: 'utf8' });
+    return spawnSync('node', [FEEDER, '--bron', 'eu-fsf', '--out', w.out, '--history', w.hist, '--key', sleutel, '--from-file', p, '--floor', '5', '--now', now, ...extra], { encoding: 'utf8' });
   };
   const reden = (w) => { const q = join(w.hist, 'quarantine'); const m = readdirSync(q).sort().pop(); return readFileSync(join(q, m, 'reden.txt'), 'utf8'); };
   const manifestTelling = (w) => JSON.parse(readFileSync(join(w.out, 'eu-fsf', 'manifest.json'), 'utf8')).entryCount;

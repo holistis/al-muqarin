@@ -13,7 +13,9 @@ const K = keypair();
 const NOW = new Date('2026-11-06T12:00:00Z');
 let n = 0;
 const fresh = (o = {}) => { const d = join(root, `case${n++}`); mkdirSync(join(d, 'hist', 'quarantine'), { recursive: true }); writeSnapshot(join(d, 'snap'), 'eu-fsf', ENTITIES, K.priv, o); return d; };
-const st = (d, extra = {}) => bepaalStatus({ snapshotDir: join(d, 'snap'), historyDir: join(d, 'hist'), pubKeyPem: K.pub, now: NOW, ...extra });
+const all = (d, extra = {}) => bepaalStatus({ bronnen: ['eu-fsf'], snapshotDir: join(d, 'snap'), historyDir: join(d, 'hist'), pubKeyPem: K.pub, now: NOW, ...extra });
+// The single list of the older tests: its own object, with the reasons as the list itself gives them.
+const st = (d, extra = {}) => all(d, extra).bronnen['eu-fsf'];
 const GOOD = { manifest: { fetchedAt: '2026-11-06T05:17:00Z', asOf: '2026-11-04' } };
 
 describe('voedingsstatus', () => {
@@ -79,7 +81,7 @@ describe('voedingsstatus', () => {
 
 describe('status-opdracht', () => {
   const pubFile = join(root, 'pub.pem'); writeFileSync(pubFile, K.pub);
-  const run = (d, extra = []) => spawnSync('node', [TOOL, '--snapshots', join(d, 'snap'), '--history', join(d, 'hist'), '--pub', pubFile, '--now', NOW.toISOString(), ...extra], { encoding: 'utf8' });
+  const run = (d, extra = [], bronnen = ['--bronnen', 'eu-fsf']) => spawnSync('node', [TOOL, '--snapshots', join(d, 'snap'), '--history', join(d, 'hist'), '--pub', pubFile, '--now', NOW.toISOString(), ...bronnen, ...extra], { encoding: 'utf8' });
   it('exits 0 and prints the object when ok; exits 1 when red', () => {
     const ok = run(fresh(GOOD));
     assert.equal(ok.status, 0, ok.stderr);
@@ -105,5 +107,65 @@ describe('status-opdracht', () => {
     assert.equal(run(d, ['--max-fetch-uren', '-5']).status, 2);
     const raw = spawnSync('node', [TOOL, '--snapshots', join(d, 'snap'), '--history', join(d, 'hist'), '--pub', pubFile, '--now', 'geen-datum'], { encoding: 'utf8' });
     assert.equal(raw.status, 2, raw.stderr);
+  });
+});
+
+describe('meerdere lijsten', () => {
+  const twee = (eerste, tweede) => {
+    const d = join(root, `twee${n++}`); mkdirSync(join(d, 'hist', 'quarantine'), { recursive: true });
+    writeSnapshot(join(d, 'snap'), 'eu-fsf', ENTITIES, K.priv, eerste);
+    if (tweede) writeSnapshot(join(d, 'snap'), 'uk-sanctions', ENTITIES, K.priv, tweede);
+    return d;
+  };
+  const beide = (d, extra = {}) => bepaalStatus({ bronnen: ['eu-fsf', 'uk-sanctions'], snapshotDir: join(d, 'snap'), historyDir: join(d, 'hist'), pubKeyPem: K.pub, now: NOW, ...extra });
+  it('is ok only when every list is ok, and says per list what it sees', () => {
+    const s = beide(twee(GOOD, GOOD));
+    assert.equal(s.ok, true, JSON.stringify(s));
+    assert.deepEqual(Object.keys(s.bronnen), ['eu-fsf', 'uk-sanctions']);
+    assert.equal(s.bronnen['uk-sanctions'].entryCount, ENTITIES.length);
+  });
+  it('one list missing makes the whole red, and the reason names that list', () => {
+    const s = beide(twee(GOOD, null));
+    assert.equal(s.ok, false);
+    assert.deepEqual(s.redenen, ['uk-sanctions:momentopname_bron_niet_aanwezig']);
+    assert.equal(s.bronnen['eu-fsf'].ok, true);
+  });
+  it('a stale list makes the whole red even when the others are fresh', () => {
+    const s = beide(twee(GOOD, { manifest: { fetchedAt: '2026-11-01T05:17:00Z', asOf: '2026-11-01' } }));
+    assert.equal(s.ok, false);
+    assert.ok(s.redenen.some((r) => r.startsWith('uk-sanctions:momentopname_verouderd')), JSON.stringify(s.redenen));
+  });
+  it('a quarantine counts for its own list only; one without a list name counts for all', () => {
+    const d = twee(GOOD, GOOD);
+    mkdirSync(join(d, 'hist', 'quarantine', '2026-11-06T11-17-00-000Z--uk-sanctions'));
+    const s = beide(d);
+    assert.equal(s.bronnen['uk-sanctions'].quarantaine_sindsdien, 1);
+    assert.equal(s.bronnen['eu-fsf'].quarantaine_sindsdien, 0);
+    assert.deepEqual(s.redenen, ['uk-sanctions:quarantaine_na_laatste_goede_run_1']);
+    mkdirSync(join(d, 'hist', 'quarantine', '2026-11-06T11-18-00-000Z'));
+    const t2 = beide(d);
+    assert.equal(t2.bronnen['eu-fsf'].quarantaine_sindsdien, 1);
+    assert.equal(t2.bronnen['uk-sanctions'].quarantaine_sindsdien, 2);
+  });
+  it('no list at all is red, never ok', () => {
+    const s = bepaalStatus({ bronnen: [], snapshotDir: join(root, 'x'), historyDir: join(root, 'y'), pubKeyPem: K.pub, now: NOW });
+    assert.equal(s.ok, false);
+    assert.deepEqual(s.redenen, ['geen_bronnen']);
+  });
+  it('the default is the three lists of the default set, not the UN list', () => {
+    const s = bepaalStatus({ snapshotDir: join(root, 'x'), historyDir: join(root, 'y'), pubKeyPem: K.pub, now: NOW });
+    assert.deepEqual(Object.keys(s.bronnen), ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
+  });
+  it('the command takes --bronnen, refuses an unknown list, and defaults to the three lists', () => {
+    const pubFile = join(root, 'pub2.pem'); writeFileSync(pubFile, K.pub);
+    const d = twee(GOOD, GOOD);
+    const run = (extra) => spawnSync('node', [TOOL, '--snapshots', join(d, 'snap'), '--history', join(d, 'hist'), '--pub', pubFile, '--now', NOW.toISOString(), ...extra], { encoding: 'utf8' });
+    const ok = run(['--bronnen', 'eu-fsf,uk-sanctions']);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.deepEqual(Object.keys(JSON.parse(ok.stdout).bronnen), ['eu-fsf', 'uk-sanctions']);
+    assert.equal(run(['--bronnen', 'eu-fsf,onzin']).status, 2);
+    const standaard = run([]);
+    assert.equal(standaard.status, 1);
+    assert.ok(JSON.parse(standaard.stdout).redenen.includes('ofac-sdn:momentopname_bron_niet_aanwezig'));
   });
 });

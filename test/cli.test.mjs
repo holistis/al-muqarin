@@ -8,7 +8,10 @@ import { COUNTRIES, ENTITIES, NOW, cleanup, keypair, tmpRoot, writeSnapshot } fr
 const CLI = new URL('../src/cli.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const root = tmpRoot();
 after(() => cleanup(root));
-const cli = (...a) => spawnSync('node', [CLI, ...a], { encoding: 'utf8' });
+// The fixtures hold one entity list (eu-fsf): a check without --bronnen would ask for the whole default set. cliRuw does not add it.
+const cliRuw = (...a) => spawnSync('node', [CLI, ...a], { encoding: 'utf8' });
+// The option goes right after the command, so an option left without a value at the end of a test still is the last one.
+const cli = (...a) => cliRuw(...(a[0] === 'check' && !a.includes('--bronnen') ? [a[0], '--bronnen', 'eu-fsf', ...a.slice(1)] : a));
 
 describe('cli', () => {
   const K = keypair();
