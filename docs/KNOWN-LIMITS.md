@@ -42,16 +42,18 @@ The same tool (`tools/zelfmeting.mjs --bron <list>`, seed 7, 300 tries per kind 
 | EU (23 Oct, 6269) | 542 of 800 (68 percent) | 2.8 percent | 0.4 percent | 22 percent |
 | UK (3 Nov, 6420) | 460 of 800 (57.5 percent) | 2.8 percent | 7.1 percent | 22.3 percent |
 | US OFAC (6 Nov, 19563) | 401 of 800 (50.1 percent) | 13.1 percent | 3.1 percent | 30.8 percent |
+| US Consolidated Screening List without the SDN entries (8 Nov, 6702) | 347 of 800 (43.4 percent) | 2.8 percent | 2.2 percent | 6.8 percent |
 | UN (8 Nov, 1007) | 332 of 703 (47.2 percent) | 0 percent | 0.4 percent | 14 percent |
 
 - The edits of the table above (a letter replaced, dropped, added or swapped, a word dropped or added, another spelling, a legal form, invisible characters, a split word, an initial, a symbol) are found in 91.7 to 100 percent of the tries on every one of these lists. The lowest: one word added on the UK list (275 of 300), one word dropped on the OFAC list (191 of 208), one letter dropped on the UK list (278 of 300).
-- A false alarm here is a `KANDIDAAT`, never a `TREFFER`: a name that looks like a listed name and needs a person to look. On the OFAC list 14 of 107 well-known companies get one (for example "Alphabet Inc" next to a listed "ALPHABET INTERNATIONAL DMCC", "Moderna" next to "MODERNA EXPRESS TRANSPORTE DE CARGA LTDA."). More lists means more things to look at; choose the lists you need with `--bronnen`.
+- On the US Consolidated Screening List the 2.8 percent for well-known companies is two candidates ("Tesla Inc" next to a listed "Tesla Hooshmand Sazan Company", "LG Electronics" next to "LES Electronics") and one real listing: "Huawei Technologies" is on the Entity List, so that one is a correct `TREFFER` that the measurement counts as an alarm because it assumes no well-known company is listed.
+- A false alarm here is a `KANDIDAAT`, normally never a `TREFFER`: a name that looks like a listed name and needs a person to look. On the OFAC list 14 of 107 well-known companies get one (for example "Alphabet Inc" next to a listed "ALPHABET INTERNATIONAL DMCC", "Moderna" next to "MODERNA EXPRESS TRANSPORTE DE CARGA LTDA."). More lists means more things to look at; choose the lists you need with `--bronnen`.
 - The UK list gave 13.3 percent false alarms on Western personal names in the first measurement, because it lists a ship called MARIA and every claim with the word Maria in it was flagged. Ships and aircraft now have their own type and are left out of the rule that flags a claim for sharing one rare word with a listed name; the figure above (7.1 percent) is after that. What is left is mostly one listed company called "LLC SMITH": every claim that contains the word Smith gets a candidate.
 
 ## Not covered
 
 - Names written in Arabic, Cyrillic or other non-Latin scripts cannot be compared and are answered `ONMEETBAAR`. Of the names in the list, 6501 are non-Latin and skipped.
-- Four lists can be fed (EU, UK, US OFAC, UN); the lists of other publishers, national lists and lists of beneficial owners are not. A party that is on none of the four lists asked for is not found, whatever it is.
+- Five lists can be fed (EU, UK, US OFAC, US Consolidated Screening List, UN); the lists of other publishers (Canada, Switzerland, Australia and others), national lists and lists of beneficial owners are not. A party that is on none of the lists asked for is not found, whatever it is.
 - No independent party has reviewed this yet. Our own reviews are not independent.
 - The time on a report is the signer's clock, marked `klok`. There is no third-party timestamp yet.
 - Every run carries a run number and the hash of the one before it. A reader that knows the highest number it has seen (`--min-volgnummer`, the counter's memory and the feeder's ledger) refuses an older list. Someone who controls both the folder and the ledger can still restart the chain: there is no copy outside the machine yet.

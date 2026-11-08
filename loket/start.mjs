@@ -6,7 +6,7 @@ import { InvalidInput, kiesBronnen } from '../src/check.mjs';
 import { luister, maakLoket } from './loket.mjs';
 
 const ALLOWED = new Set(['snapshots', 'pub', 'key', 'port', 'vertrouw-proxy', 'ledger', 'bronnen']);
-const USAGE = 'gebruik: --snapshots D --pub P --key K [--port N] [--vertrouw-proxy ja] [--ledger history/ledger.jsonl] [--bronnen eu-fsf,uk-sanctions,ofac-sdn,un-sc]';
+const USAGE = 'gebruik: --snapshots D --pub P --key K [--port N] [--vertrouw-proxy ja] [--ledger history/ledger.jsonl] [--bronnen eu-fsf,uk-sanctions,ofac-sdn,us-csl,un-sc]';
 const opt = {};
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 2) {

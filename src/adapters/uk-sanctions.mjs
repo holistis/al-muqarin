@@ -1,13 +1,13 @@
 // Pure parser for the UK Sanctions List (UK-Sanctions-List.xml, FCDO). No network, no filesystem.
 // Source: sanctionslist.fcdo.gov.uk. Self-check: a record that is not closed, closed too late or empty makes the parser throw
 // (see records.mjs), and so does a designation without an id.
+import { jaarOk } from './jaren.mjs';
 import { landCode } from './landnamen.mjs';
 import { alleTeksten, blokken, eindeControle, records, tekst } from './records.mjs';
 
 const SOORT = { Individual: 'persoon', Entity: 'onderneming', Ship: 'voertuig' };
 // A full name is written in parts: Name1 to Name5 are given and other names, Name6 is the family name (or the whole name of an entity or ship).
 const DELEN = ['Name1', 'Name2', 'Name3', 'Name4', 'Name5', 'Name6'];
-const jaarOk = (y) => Number.isInteger(y) && y >= 1800 && y <= 2200;
 
 export function parseUkSanctions(xml) {
   const gen = /<DateGenerated>(\d{2})\/(\d{2})\/(\d{4})<\/DateGenerated>/.exec(xml);

@@ -5,6 +5,10 @@ import { parseEuFsf } from '../src/adapters/eu-fsf.mjs';
 import { parseOfacSdn } from '../src/adapters/ofac-sdn.mjs';
 import { parseUkSanctions } from '../src/adapters/uk-sanctions.mjs';
 import { parseUnSc } from '../src/adapters/un-sc.mjs';
+import { parseUsCsl } from '../src/adapters/us-csl.mjs';
+
+// What the downloader gets for a list: the address and everything it must check where the download ends.
+export const downloadOpties = (b) => ({ url: b.url, allowedHost: b.hosts, allowedPathPrefix: b.pathPrefix, inhoud: b.inhoud });
 
 export const BRONNEN = {
   'eu-fsf': {
@@ -31,6 +35,15 @@ export const BRONNEN = {
     floor: 10000,
     parse: parseOfacSdn,
     license: 'Specially Designated Nationals and Blocked Persons List, US Treasury OFAC. Published by a US federal agency for public use; works of the US federal government carry no US copyright (17 U.S.C. 105, our reading, not a statement by OFAC). No usage terms were found on the OFAC Sanctions List Service pages read on 2026-11-08. The legal text of the designations is in the Federal Register; this is a copy for comparison only.',
+  },
+  'us-csl': {
+    url: 'https://data.trade.gov/downloadable_consolidated_screening_list/v1/consolidated.json',
+    hosts: ['data.trade.gov'],
+    pathPrefix: '/downloadable_consolidated_screening_list/',
+    inhoud: /json/,
+    floor: 4000,
+    parse: parseUsCsl,
+    license: 'Consolidated Screening List, US Department of Commerce (International Trade Administration), put together from export-control and sanctions lists of the Commerce, State and Treasury departments. A US federal government work; works of the US federal government carry no US copyright (17 U.S.C. 105; our reading, not a statement by the publishers). The page of the publisher that would state usage terms (data.commerce.gov) answered HTTP 403 and could not be read on 2026-11-08, so no usage terms were read. The SDN entries of the file are left out here, because the OFAC list is its own source. An export-control listing is not a sanction in every case; the lists inside the file say which restriction applies. Only the publishers\' own texts are authentic.',
   },
   // Not part of the default set (see ENTITY_SOURCES): the UN terms are not clear for this use.
   'un-sc': {

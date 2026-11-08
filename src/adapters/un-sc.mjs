@@ -1,6 +1,7 @@
 // Pure parser for the UN Security Council consolidated list (XML). No network, no filesystem.
 // Source: scsanctions.un.org, the "consolidated.xml" file (individuals and entities). Self-check: a record that is not closed, closed
 // too late or empty makes the parser throw (see records.mjs).
+import { jaarOk } from './jaren.mjs';
 import { landCode } from './landnamen.mjs';
 import { alleTeksten, blokken, eindeControle, records, tekst } from './records.mjs';
 
@@ -8,7 +9,6 @@ const NAAM_DELEN = ['FIRST_NAME', 'SECOND_NAME', 'THIRD_NAME', 'FOURTH_NAME'];
 // The list writes "na" where a name part does not exist.
 const LEEG = /^n\/?a$/i;
 const JAAR = /^(\d{4})/;
-const jaarOk = (y) => Number.isInteger(y) && y >= 1800 && y <= 2200;
 
 function lees(inner, soort) {
   const id = tekst(inner, 'REFERENCE_NUMBER') ?? tekst(inner, 'DATAID');

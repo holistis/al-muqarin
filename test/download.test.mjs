@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { after, before, describe, it } from 'node:test';
-import { downloadXml } from '../feeder/download.mjs';
+import { downloadLijst } from '../feeder/download.mjs';
 
 let server, base;
 before(async () => {
   server = createServer((req, res) => {
     if (req.url.split('?')[0] === '/ok') { res.writeHead(200, { 'content-type': 'application/xml' }); res.end('<a/>'); }
+    else if (req.url === '/json') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}'); }
     else if (req.url === '/html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<a/>'); }
     else if (req.url === '/big') { res.writeHead(200, { 'content-type': 'application/xml' }); res.end('x'.repeat(5000)); }
     else if (req.url === '/redirect') { res.writeHead(302, { location: 'http://localhost:' + server.address().port + '/ok' }); res.end(); }
@@ -18,13 +19,13 @@ before(async () => {
 after(() => server.close());
 
 // The test server speaks plain http on loopback; the real downloader refuses that unless told otherwise.
-const dl = (path, over = {}) => downloadXml({ url: base + path, allowedHost: new URL(base).host, toestaanHttp: true, ...over });
+const dl = (path, over = {}) => downloadLijst({ url: base + path, allowedHost: new URL(base).host, toestaanHttp: true, ...over });
 
 describe('download limits', () => {
   it('accepts a small xml from the allowed host', async () => assert.equal((await dl('/ok')).toString(), '<a/>'));
   it('rejects another host', async () => await assert.rejects(dl('/ok', { allowedHost: 'webgate.ec.europa.eu' }), /andere host/));
   it('rejects a redirect to another host', async () => await assert.rejects(dl('/redirect'), /andere host/));
-  it('rejects non-xml', async () => await assert.rejects(dl('/html'), /geen xml/));
+  it('rejects non-xml', async () => await assert.rejects(dl('/html'), /onverwacht inhoudstype/));
   it('rejects http errors', async () => await assert.rejects(dl('/nope'), /http 404/));
   it('rejects a body over the size cap', async () => await assert.rejects(dl('/big', { maxBytes: 1000 }), /te groot/));
   it('times out', async () => await assert.rejects(dl('/ok', { timeoutMs: 1, fetchImpl: (u, o) => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(new Error('timeout')))) }), /timeout/));
@@ -52,10 +53,18 @@ describe('download: https only', () => {
   });
   it('accepts https (a fake fetch that ends on an https address)', async () => {
     const fetchImpl = async () => ({ ok: true, url: 'https://lijst.example/docs/x.xml', headers: new Map([['content-type', 'text/xml']]), body: (async function* () { yield Buffer.from('<a/>'); })() });
-    assert.equal((await downloadXml({ url: 'https://lijst.example/docs/x.xml', allowedHost: 'lijst.example', allowedPathPrefix: '/docs/', fetchImpl })).toString(), '<a/>');
+    assert.equal((await downloadLijst({ url: 'https://lijst.example/docs/x.xml', allowedHost: 'lijst.example', allowedPathPrefix: '/docs/', fetchImpl })).toString(), '<a/>');
   });
   it('refuses a redirect from https to http on the same host', async () => {
     const fetchImpl = async () => ({ ok: true, url: 'http://lijst.example/docs/x.xml', headers: new Map([['content-type', 'text/xml']]), body: (async function* () { yield Buffer.from('<a/>'); })() });
-    await assert.rejects(downloadXml({ url: 'https://lijst.example/docs/x.xml', allowedHost: 'lijst.example', fetchImpl }), /onbeveiligde verbinding/);
+    await assert.rejects(downloadLijst({ url: 'https://lijst.example/docs/x.xml', allowedHost: 'lijst.example', fetchImpl }), /onbeveiligde verbinding/);
   });
+});
+
+describe('download: the content type a list names', () => {
+  it('accepts json when the list says json, and refuses it when the default (xml) is asked', async () => {
+    assert.equal((await dl('/json', { inhoud: /json/ })).toString(), '{}');
+    await assert.rejects(dl('/json'), /onverwacht inhoudstype/);
+  });
+  it('refuses xml when the list says json', async () => await assert.rejects(dl('/ok', { inhoud: /json/ }), /onverwacht inhoudstype/));
 });

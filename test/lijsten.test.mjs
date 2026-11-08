@@ -8,6 +8,7 @@ import { parseEuFsf } from '../src/adapters/eu-fsf.mjs';
 import { alleTeksten, blokken, decode, eindeControle, records, tekst, zonder } from '../src/adapters/records.mjs';
 import { parseUkSanctions } from '../src/adapters/uk-sanctions.mjs';
 import { parseUnSc } from '../src/adapters/un-sc.mjs';
+import { parseUsCsl } from '../src/adapters/us-csl.mjs';
 import { runCheck } from '../src/check.mjs';
 import { ISO_ALPHA2 } from '../src/countries.mjs';
 import { NOW, cleanup, keypair, tmpRoot, writeSnapshot } from './fixture.mjs';
@@ -169,6 +170,7 @@ describe('OFAC SDN parser', () => {
     assert.deepEqual(dob('1951 to 1953').jaren, [1951, 1952, 1953]);
     assert.deepEqual(dob('1940 to 1970').jaren, [1940, 1970]);
     assert.deepEqual(dob('1953 to 1951').jaren, [1951, 1953]);
+    assert.deepEqual(dob('1950 to 1953 and 1960').jaren, [1950, 1953, 1960], 'a "to" with a third year is not a range');
   });
   it('birth years: two years in one text without "to" are two years, not a range', () => assert.deepEqual(dob('1951 or 1953').jaren, [1951, 1953]));
   it('birth years: a text with no usable year gives none, and "circa" without a year does not mark the entry', () => {
@@ -230,7 +232,7 @@ describe('UK list parser', () => {
   });
   it('decodes xml references in names', () => assert.deepEqual(parseUkSanctions(uk(desig('A1', `<Names>${naam({ Name6: 'B&amp;H Central' })}</Names>`))).entries[0].names, ['B&H Central']));
   it('birth years from the partial dates the list uses', () => {
-    const r = parseUkSanctions(uk(desig('A1', '<Names></Names><IndividualDetails><Individual><DOBs><DOB>dd/mm/1945</DOB><DOB>13/04/1964</DOB><DOB>1950</DOB><DOB>dd/mm/1000</DOB><DOB>onbekend</DOB></DOBs></Individual></IndividualDetails>')));
+    const r = parseUkSanctions(uk(desig('A1', '<Names></Names><IndividualDetails><Individual><DOBs><DOB>dd/mm/1945</DOB><DOB>13/04/1964</DOB><DOB>1950</DOB><DOB>dd/mm/1000</DOB><DOB>dd/mm/2300</DOB><DOB>onbekend</DOB></DOBs></Individual></IndividualDetails>')));
     assert.deepEqual(r.entries[0].jaren, [1945, 1950, 1964]);
     assert.equal(r.entries[0].ongeveer, undefined);
   });
@@ -322,4 +324,86 @@ describe('hostile and cut-off files', () => {
     assert.doesNotThrow(() => eindeControle('x'.repeat(300) + '</root>', '</root>'));
     assert.throws(() => eindeControle('</root>' + 'x'.repeat(50), '</root>'), /afgekapt/, 'the closing tag must be the LAST thing, not just near the end');
   });
+});
+
+const SDN = 'Specially Designated Nationals (SDN) - Treasury Department';
+const EL = 'Entity List (EL) - Bureau of Industry and Security';
+const csl = (results, { total, bronnen } = {}) => JSON.stringify({ results, search_performed_at: '2026-11-08T14:47:11+00:00', sources_used: bronnen ?? [{ source: SDN, last_imported: '2026-11-08T14:15:00.033979+00:00' }], offset: 0, total: total ?? results.length });
+const rec = (o) => ({ source: EL, id: '1', name: 'Name', alt_names: null, ...o });
+
+describe('US Consolidated Screening List parser', () => {
+  it('reads names and other names (trimmed, without doubles), the type, and the date the file was put together', () => {
+    const r = parseUsCsl(csl([
+      rec({ id: 'a', name: 'SPC Supachoke ', alt_names: ['Super Trade', ' ', 'Super Trade', 'SPC Supachoke'], type: 'Entity' }),
+      rec({ id: 'b', name: 'Ibrahim Haqqani', alt_names: ['Hajji Sahib'] }),
+    ]));
+    assert.equal(r.asOf, '2026-11-08');
+    assert.deepEqual(r.entries, [
+      { id: 'a', names: ['SPC Supachoke', 'Super Trade'], soort: 'onderneming' },
+      { id: 'b', names: ['Ibrahim Haqqani', 'Hajji Sahib'], soort: 'onbekend' },
+    ]);
+  });
+  it('the type: person, enterprise, ship and aircraft are "voertuig", a missing type is "onbekend"', () => {
+    const r = parseUsCsl(csl(['Individual', 'Entity', 'Vessel', 'Aircraft', undefined, 'Other'].map((type, i) => rec({ id: `t${i}`, type }))));
+    assert.deepEqual(r.entries.map((e) => e.soort), ['persoon', 'onderneming', 'voertuig', 'voertuig', 'onbekend', 'onbekend']);
+  });
+  it('leaves out the Treasury SDN entries (the OFAC list is its own source) even though the file counts them in its total', () => {
+    const r = parseUsCsl(csl([rec({ id: 's1', source: SDN, name: 'Sanctioned Person' }), rec({ id: 'e1', name: 'Entity One' }), rec({ id: 's2', source: SDN, name: 'Another' })]));
+    assert.deepEqual(r.entries.map((e) => e.id), ['e1']);
+  });
+  it('the same id on two records: the later ones get a suffix, so ids stay unique', () => {
+    const r = parseUsCsl(csl([rec({ id: 'x', name: 'One' }), rec({ id: 'x', name: 'Two' }), rec({ id: 'x', name: 'Three' }), rec({ id: 'y', name: 'Four' })]));
+    assert.deepEqual(r.entries.map((e) => e.id), ['x', 'x#2', 'x#3', 'y']);
+  });
+  it('the date is the latest import among the sources, whatever their order, and only valid days count', () => {
+    const bronnen = [{ source: SDN, last_imported: '2026-11-06T10:00:00+00:00' }, { source: 'A', last_imported: '2026-11-08T01:00:00+00:00' }, { source: 'E', last_imported: '2026-99-99T00:00:00+00:00' }, { source: 'B', last_imported: 'niet een datum' }, { source: 'C' }, null, { source: 'D', last_imported: '2026-11-07T23:59:00+00:00' }];
+    assert.equal(parseUsCsl(csl([rec({})], { bronnen })).asOf, '2026-11-08');
+  });
+  it('birth years: an ISO date, a year, "circa", a range written out, several, sorted; "circa" without a year does not mark the entry', () => {
+    const jaar = (dates) => parseUsCsl(csl([rec({ dates_of_birth: dates })])).entries[0];
+    assert.deepEqual(jaar(['1965-07-04']).jaren, [1965]);
+    assert.deepEqual(jaar(['1990', '1980']).jaren, [1980, 1990]);
+    const c = jaar(['circa 1951']);
+    assert.deepEqual([c.jaren, c.ongeveer], [[1951], true]);
+    assert.deepEqual(jaar(['1951 to 1953']).jaren, [1951, 1952, 1953]);
+    assert.deepEqual(jaar(['01 Jan 1959 to 31 Dec 1960']).jaren, [1959, 1960]);
+    const leeg = jaar(['circa unknown', '1000']);
+    assert.deepEqual([leeg.jaren, leeg.ongeveer], [undefined, undefined]);
+    assert.equal(jaar(undefined).jaren, undefined);
+    assert.equal(jaar(null).jaren, undefined);
+  });
+  it('at most 50 years and 100 countries are kept (the signed list refuses more)', () => {
+    const jaren = Array.from({ length: 60 }, (_, i) => String(1950 + i));
+    assert.equal(parseUsCsl(csl([rec({ dates_of_birth: jaren })])).entries[0].jaren.length, 50);
+  });
+  it('at most 100 countries are kept', () => {
+    const veel = ['US', 'GB', 'DE', 'FR', 'NL', 'BE', 'ES', 'IT', 'PT', 'IE', 'AT', 'CH', 'SE', 'NO', 'DK', 'FI', 'PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'GR', 'TR', 'RU', 'UA', 'BY', 'KZ', 'CN', 'JP', 'KR', 'IN', 'PK', 'ID', 'TH', 'VN', 'PH', 'MY', 'SG', 'AU', 'NZ', 'CA', 'MX', 'BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EG', 'ZA', 'NG', 'KE', 'ET', 'MA', 'DZ', 'TN', 'LY', 'SD', 'SA', 'AE', 'QA', 'KW', 'IQ', 'IR', 'SY', 'LB', 'JO', 'IL', 'YE', 'OM', 'AF', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'MN', 'UZ', 'TM', 'KG', 'TJ', 'AZ', 'AM', 'GE', 'MD', 'LT', 'LV', 'EE', 'IS', 'LU', 'MT', 'CY', 'HR', 'SI', 'RS', 'BA', 'AL', 'MK', 'ME', 'CU', 'DO', 'GT', 'HN', 'NI', 'PA', 'EC', 'BO', 'UY', 'PY'];
+    assert.ok(veel.length > 100);
+    const r = parseUsCsl(csl([rec({ type: 'Entity', addresses: veel.map((country) => ({ country })) })]));
+    assert.equal(r.entries[0].landen.length, 100);
+  });
+  it('countries: a person gets nationality and citizenship, anything else gets the countries of its addresses and its own country; codes in upper case, unknown dropped', () => {
+    const landen = (o) => parseUsCsl(csl([rec(o)])).entries[0].landen;
+    assert.deepEqual(landen({ type: 'Individual', nationalities: ['sy', 'ZZ'], citizenships: ['Iraq'], addresses: [{ country: 'RU' }], country: 'FR' }), ['IQ', 'SY']);
+    assert.deepEqual(landen({ type: 'Entity', addresses: [{ country: 'HK' }, { country: 'RU' }, { country: "people's republic of china (prc)" }, { country: null }, null], country: 'th' }), ['HK', 'RU', 'TH']);
+    assert.deepEqual(landen({ addresses: [{ country: 'Turkiye' }] }), ['TR']);
+    assert.equal(landen({ addresses: [{ country: 'ZZ' }] }), undefined);
+    assert.deepEqual(landen({ type: 'Entity', nationalities: ['DE'] }), ['DE'], 'a nationality or citizenship is read whatever the type');
+  });
+  it('a file that is not what we expect is an error: no JSON, wrong shape, wrong total, no SDN source, no date, a record without id, name or shape', () => {
+    assert.throws(() => parseUsCsl('niet json'), /geen geldige JSON/);
+    assert.throws(() => parseUsCsl('[]'), /vorm van het bestand/);
+    assert.throws(() => parseUsCsl(JSON.stringify({ results: {}, sources_used: [] })), /vorm van het bestand/);
+    assert.throws(() => parseUsCsl(JSON.stringify({ results: [], total: 0 })), /vorm van het bestand/);
+    assert.throws(() => parseUsCsl(csl([rec({})], { total: 2 })), /aantal klopt niet/);
+    assert.throws(() => parseUsCsl(csl([rec({})], { bronnen: [{ source: 'Other', last_imported: '2026-11-08T00:00:00+00:00' }] })), /SDN-bron/);
+    assert.throws(() => parseUsCsl(csl([rec({})], { bronnen: [{ source: SDN }] })), /datum van het bestand/);
+    assert.throws(() => parseUsCsl(csl([rec({ id: '' })])), /zonder id/);
+    assert.throws(() => parseUsCsl(csl([rec({ id: undefined })])), /zonder id/);
+    assert.throws(() => parseUsCsl(csl([rec({ name: ' ' })])), /zonder naam/);
+    assert.throws(() => parseUsCsl(csl([rec({ name: undefined })])), /zonder naam/);
+    assert.throws(() => parseUsCsl(csl([null])), /zonder vorm/);
+    assert.throws(() => parseUsCsl(csl([[]])), /zonder vorm/);
+  });
+  it('an SDN-only file gives zero entries (the feeder refuses that by its floor)', () => assert.equal(parseUsCsl(csl([rec({ source: SDN })])).entries.length, 0));
 });

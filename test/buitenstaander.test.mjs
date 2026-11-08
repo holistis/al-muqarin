@@ -209,7 +209,7 @@ describe('F6 en F14: strikte JSON', () => {
 describe('uitkomsten blijven één van de vier', () => {
   it('sanity: the outcome list is unchanged and the known sources are the ones the design names (the UN list is known but not in the default set)', () => {
     assert.deepEqual(OUTCOMES, ['TREFFER', 'KANDIDAAT', 'ONMEETBAAR', 'GEEN_TREFFER_IN_LIJST']);
-    assert.deepEqual([...new Set(Object.values(REQUIRED).flat())].sort(), ['cahras', 'eu-fsf', 'ofac-sdn', 'uk-sanctions']);
+    assert.deepEqual([...new Set(Object.values(REQUIRED).flat())].sort(), ['cahras', 'eu-fsf', 'ofac-sdn', 'uk-sanctions', 'us-csl']);
     assert.ok(!Object.values(REQUIRED).flat().includes('un-sc'), 'the UN list is opt-in until its terms are clear');
   });
 });

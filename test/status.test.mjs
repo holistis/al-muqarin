@@ -152,11 +152,11 @@ describe('meerdere lijsten', () => {
     assert.equal(s.ok, false);
     assert.deepEqual(s.redenen, ['geen_bronnen']);
   });
-  it('the default is the three lists of the default set, not the UN list', () => {
+  it('the default is the four lists of the default set, not the UN list', () => {
     const s = bepaalStatus({ snapshotDir: join(root, 'x'), historyDir: join(root, 'y'), pubKeyPem: K.pub, now: NOW });
-    assert.deepEqual(Object.keys(s.bronnen), ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
+    assert.deepEqual(Object.keys(s.bronnen), ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl']);
   });
-  it('the command takes --bronnen, refuses an unknown list, and defaults to the three lists', () => {
+  it('the command takes --bronnen, refuses an unknown list, and defaults to the four lists', () => {
     const pubFile = join(root, 'pub2.pem'); writeFileSync(pubFile, K.pub);
     const d = twee(GOOD, GOOD);
     const run = (extra) => spawnSync('node', [TOOL, '--snapshots', join(d, 'snap'), '--history', join(d, 'hist'), '--pub', pubFile, '--now', NOW.toISOString(), ...extra], { encoding: 'utf8' });

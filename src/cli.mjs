@@ -25,7 +25,7 @@ for (let i = 0; i < rest.length; i += 2) {
 }
 
 function usage() {
-  console.error('usage:\n  keygen --dir D\n  check --claims F --snapshots D --pub P --key K [--out F] [--now ISO] [--max-age-days N] [--min-volgnummer BRON=N,BRON=N] [--ledger history/ledger.jsonl] [--bronnen eu-fsf,uk-sanctions,ofac-sdn,un-sc]\n  verify --report F --pub P [--claims F] [--expect KEY_ID] [--expect-bronnen eu-fsf,uk-sanctions,ofac-sdn]\nexit: 0 alle claims GEEN_TREFFER_IN_LIJST, 20 ONMEETBAAR, 21 KANDIDAAT, 22 TREFFER, 1 ongeldig rapport, 2 ongeldige invoer, 3 onverwachte fout');
+  console.error('usage:\n  keygen --dir D\n  check --claims F --snapshots D --pub P --key K [--out F] [--now ISO] [--max-age-days N] [--min-volgnummer BRON=N,BRON=N] [--ledger history/ledger.jsonl] [--bronnen eu-fsf,uk-sanctions,ofac-sdn,us-csl,un-sc]\n  verify --report F --pub P [--claims F] [--expect KEY_ID] [--expect-bronnen eu-fsf,uk-sanctions,ofac-sdn,us-csl]\nexit: 0 alle claims GEEN_TREFFER_IN_LIJST, 20 ONMEETBAAR, 21 KANDIDAAT, 22 TREFFER, 1 ongeldig rapport, 2 ongeldige invoer, 3 onverwachte fout');
   process.exit(2);
 }
 // "eu-fsf=3,uk-sanctions=2" to { 'eu-fsf': 3, 'uk-sanctions': 2 }. Each list once, N from 1.

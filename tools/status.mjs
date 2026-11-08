@@ -6,7 +6,7 @@ import { DEFAULT_ENTITY_SOURCES, InvalidInput, kiesBronnen } from '../src/check.
 import { bepaalStatus } from './status-lib.mjs';
 
 const ALLOWED = new Set(['snapshots', 'history', 'pub', 'out', 'now', 'max-fetch-uren', 'max-lijst-dagen', 'bronnen']);
-const USAGE = 'gebruik: --snapshots D --history D --pub P [--out F] [--now ISO] [--max-fetch-uren N] [--max-lijst-dagen N] [--bronnen eu-fsf,uk-sanctions,ofac-sdn,un-sc] (standaard: de eerste drie)';
+const USAGE = 'gebruik: --snapshots D --history D --pub P [--out F] [--now ISO] [--max-fetch-uren N] [--max-lijst-dagen N] [--bronnen eu-fsf,uk-sanctions,ofac-sdn,us-csl,un-sc] (standaard: de eerste vier)';
 const opt = {};
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 2) {

@@ -369,6 +369,6 @@ describe('loket: de lijsten waarmee vergeleken wordt', () => {
     reset(); const { base } = await start({ opties: { required: undefined } });
     const j = await (await post(base, [claim('Unknown Firm')])).json();
     assert.equal(j.report.resultaten[0].uitkomst, 'ONMEETBAAR');
-    assert.deepEqual(j.report.bronnen.map((b) => b.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
+    assert.deepEqual(j.report.bronnen.map((b) => b.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl']);
   });
 });

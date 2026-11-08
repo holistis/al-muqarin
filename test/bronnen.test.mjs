@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
-import { BRONNEN } from '../feeder/bronnen.mjs';
+import { BRONNEN, downloadOpties } from '../feeder/bronnen.mjs';
 import { DEFAULT_ENTITY_SOURCES, ENTITY_SOURCES, InvalidInput, REQUIRED, kiesBronnen, runCheck, signReport, verifyReport } from '../src/check.mjs';
 import { loadSnapshot } from '../src/snapshot.mjs';
 import { ENTITIES, NOW, cleanup, keypair, tmpRoot, writeSnapshot } from './fixture.mjs';
@@ -21,8 +21,8 @@ const pubFile = join(root, 'pub.pem'); writeFileSync(pubFile, K.pub);
 
 describe('the lists we know', () => {
   it('the feeder knows exactly the lists the checker knows', () => assert.deepEqual(Object.keys(BRONNEN).sort(), [...ENTITY_SOURCES].sort()));
-  it('the default set is three of them, the UN list is not in it, and the country list stays as it was', () => {
-    assert.deepEqual(DEFAULT_ENTITY_SOURCES, ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
+  it('the default set is four of them, the UN list is not in it, and the country list stays as it was', () => {
+    assert.deepEqual(DEFAULT_ENTITY_SOURCES, ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl']);
     assert.ok(ENTITY_SOURCES.includes('un-sc') && !DEFAULT_ENTITY_SOURCES.includes('un-sc'));
     assert.deepEqual(REQUIRED, { entity: DEFAULT_ENTITY_SOURCES, country: ['cahras'] });
   });
@@ -41,12 +41,30 @@ describe('the lists we know', () => {
       if (b.pathPrefix !== undefined && b.hosts.includes(new URL(b.url).host)) assert.ok(new URL(b.url).pathname.startsWith(b.pathPrefix), `${id}: ${new URL(b.url).pathname}`);
     }
   });
+  it('the downloader gets, for each list, exactly its address, its hosts, its path prefix and its content type', () => {
+    for (const [id, b] of Object.entries(BRONNEN)) {
+      const o = downloadOpties(b);
+      assert.equal(o.url, b.url, id);
+      assert.deepEqual(o.allowedHost, b.hosts, id);
+      assert.equal(o.allowedPathPrefix, b.pathPrefix, id);
+      assert.equal(o.inhoud, b.inhoud, id);
+    }
+    assert.ok(BRONNEN['us-csl'].inhoud.test('application/json') && !BRONNEN['us-csl'].inhoud.test('text/xml') && !BRONNEN['us-csl'].inhoud.test('text/html'));
+    for (const id of ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'un-sc']) assert.equal(BRONNEN[id].inhoud, undefined, `${id}: xml is the default`);
+    // The feeder passes exactly that to the downloader, and nothing typed by hand next to it.
+    const bron = readFileSync(FEEDER, 'utf8');
+    assert.match(bron, /downloadLijst\(\{ \.\.\.downloadOpties\(B\), maxBytes: MAX_BYTES \}\)/);
+    assert.doesNotMatch(bron, /allowedHost|allowedPathPrefix/);
+  });
   it('the terms of each list say what they rest on: the EU decision, the Open Government Licence, no US copyright, the UN site terms', () => {
     assert.match(BRONNEN['eu-fsf'].license, /2011\/833\/EU/);
     assert.match(BRONNEN['uk-sanctions'].license, /Published under the Open Government Licence v3\.0/);
     assert.match(BRONNEN['uk-sanctions'].license, /Contains public sector information licensed under the Open Government Licence v3\.0/);
     assert.match(BRONNEN['ofac-sdn'].license, /17 U\.S\.C\. 105/);
     assert.match(BRONNEN['ofac-sdn'].license, /our reading, not a statement by OFAC/);
+    assert.match(BRONNEN['us-csl'].license, /17 U\.S\.C\. 105/);
+    assert.match(BRONNEN['us-csl'].license, /HTTP 403 and could not be read on 20\d\d-\d\d-\d\d, so no usage terms were read/);
+    assert.match(BRONNEN['us-csl'].license, /SDN entries of the file are left out/);
     assert.match(BRONNEN['un-sc'].license, /personal, non-commercial use/);
     assert.match(BRONNEN['un-sc'].license, /No permission from the UN has been asked or given/);
   });
@@ -68,6 +86,7 @@ const BESTANDEN = {
   'eu-fsf': (n) => `<?xml version="1.0"?><export generationDate="2026-11-05T10:00:00.000+01:00">${Array.from({ length: n }, (_, i) => `<sanctionEntity euReferenceNumber="EU.${i}" logicalId="${i}"><nameAlias wholeName="Name Number ${i} &amp; Co" logicalId="${i}"/></sanctionEntity>`).join('')}</export>`,
   'uk-sanctions': (n) => `<?xml version="1.0"?><Designations><DateGenerated>05/11/2026</DateGenerated>${Array.from({ length: n }, (_, i) => `<Designation><UniqueID>UK${i}</UniqueID><Names><Name><Name1>Name</Name1><Name2>Number</Name2><Name6>${i} Co</Name6><NameType>Primary Name</NameType></Name></Names><IndividualEntityShip>Entity</IndividualEntityShip></Designation>`).join('')}</Designations>`,
   'ofac-sdn': (n) => `<?xml version="1.0"?><sdnList><publshInformation><Publish_Date>11/05/2026</Publish_Date><Record_Count>${n}</Record_Count></publshInformation>${Array.from({ length: n }, (_, i) => `<sdnEntry><uid>${i + 1}</uid><lastName>Name Number ${i} Co</lastName><sdnType>Entity</sdnType></sdnEntry>`).join('')}</sdnList>`,
+  'us-csl': (n) => JSON.stringify({ results: Array.from({ length: n }, (_, i) => ({ source: 'Entity List (EL) - Bureau of Industry and Security', id: `E${i}`, name: `Name Number ${i} Co`, alt_names: null, addresses: [{ country: 'HK' }] })), search_performed_at: '2026-11-05T10:00:00+00:00', sources_used: [{ source: 'Specially Designated Nationals (SDN) - Treasury Department', last_imported: '2026-11-05T10:00:00+00:00' }], offset: 0, total: n }),
   'un-sc': (n) => `<?xml version="1.0"?><CONSOLIDATED_LIST dateGenerated="2026-11-05T00:00:00.000Z"><ENTITIES>${Array.from({ length: n }, (_, i) => `<ENTITY><DATAID>${i}</DATAID><FIRST_NAME>Name Number ${i} Co</FIRST_NAME><REFERENCE_NUMBER>UN.${i}</REFERENCE_NUMBER></ENTITY>`).join('')}</ENTITIES></CONSOLIDATED_LIST>`,
 };
 const out = join(root, 'snaps'), hist = join(root, 'hist');
@@ -160,9 +179,9 @@ describe('the checker over more than one list', () => {
     assert.equal(r.resultaten[0].uitkomst, 'GEEN_TREFFER_IN_LIJST');
     assert.deepEqual(r.bronnen.map((b) => b.bron), ['eu-fsf']);
   });
-  it('the default set asks for three lists, never the UN list', () => {
+  it('the default set asks for four lists, never the UN list', () => {
     const r = runCheck({ claims: [{ id: 'a', type: 'entity', value: 'x firm' }], snapshotDir: dir, pubKeyPem: K.pub, now: NOW });
-    assert.deepEqual(r.resultaten[0].per_bron.map((p) => p.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
+    assert.deepEqual(r.resultaten[0].per_bron.map((p) => p.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl']);
   });
   it('a minimum run number is only accepted for a list that is in the set asked for', () => {
     assert.throws(() => check('x firm', 'eu-fsf', { minVolgnummer: { 'un-sc': 1 } }), InvalidInput);
@@ -189,7 +208,7 @@ describe('the command line over more than one list', () => {
     const r = run();
     assert.equal(r.status, 20, r.stderr);
     const j = JSON.parse(r.stdout);
-    assert.deepEqual(j.report.bronnen.map((b) => b.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn']);
+    assert.deepEqual(j.report.bronnen.map((b) => b.bron), ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl']);
   });
   it('an unknown or repeated list name is invalid input (exit 2)', () => {
     for (const x of ['onzin', 'eu-fsf,eu-fsf', '']) assert.equal(run('--bronnen', x).status, 2, x);
@@ -214,7 +233,7 @@ describe('the counter over more than one list', () => {
       } finally { kind.kill(); }
     };
     assert.deepEqual(await vraag(true), ['eu-fsf']);
-    assert.deepEqual(await vraag(false), ['eu-fsf', 'uk-sanctions', 'ofac-sdn'], 'without the option the default set is asked');
+    assert.deepEqual(await vraag(false), ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl'], 'without the option the default set is asked');
   });
   it('takes the set of lists from its start command, and refuses an unknown one', () => {
     const START = pad('../loket/start.mjs');

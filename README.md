@@ -18,16 +18,16 @@ node src/cli.mjs verify --report demo/report.json --pub demo/keys/muqarin-public
 
 A claims file is a JSON list; every claim has exactly `id` (letters, digits, `._:-`, up to 64), `type` (`entity` or `country`) and `value`, plus an optional `birthYear` and `country` for an entity. See `examples/claims.json`. The report text is in Dutch for now. The first command prints the counts and the worst outcome; the exit code says it too (see below).
 
-With real data you need the feeder (`feeder/`), which fetches the lists from the network (see "Lists" below). The unit tests need nothing: `npm test` (about 10 seconds). The planted-fault proof `npm run mutatie` is slow: with 371 faults it took about 65 minutes on our machine with six parts running at the same time (`node tools/mutatie-proef.mjs "" 0/6` up to `5/6` in six terminals), much longer in one piece; with the 510 faults of today we ran it in separate groups over several hours, and two or three groups at once is the most our machine took (more made the baseline run fail on memory). A fault that makes the tests loop for ever is stopped by a time limit (four minutes) and counted apart; one fault needs real file modes and is skipped on Windows.
+With real data you need the feeder (`feeder/`), which fetches the lists from the network (see "Lists" below). The unit tests need nothing: `npm test` (about 10 seconds). The planted-fault proof `npm run mutatie` is slow: with 371 faults it took about 65 minutes on our machine with six parts running at the same time (`node tools/mutatie-proef.mjs "" 0/6` up to `5/6` in six terminals), much longer in one piece; with the 548 faults of today we ran it in separate groups over several hours, and two or three groups at once is the most our machine took (more made the baseline run fail on memory). A fault that makes the tests loop for ever is stopped by a time limit (four minutes) and counted apart; one fault needs real file modes and is skipped on Windows.
 
 ## Commands
 
 ```
 node src/cli.mjs keygen --dir keys
-node src/cli.mjs check --claims claims.json --snapshots snapshots --pub keys/muqarin-public.pem --key keys/muqarin-private.pem --out report.json [--bronnen eu-fsf,uk-sanctions,ofac-sdn] [--ledger history/ledger.jsonl]
-node src/cli.mjs verify --report report.json --pub keys/muqarin-public.pem --claims claims.json [--expect-bronnen eu-fsf,uk-sanctions,ofac-sdn]
-npm test           # 553 tests, including random and metamorphic ones (one is skipped on Windows: it needs real file modes)
-npm run mutatie    # plants 510 faults in the code, the counter and the measuring tool; the tests must catch every one
+node src/cli.mjs check --claims claims.json --snapshots snapshots --pub keys/muqarin-public.pem --key keys/muqarin-private.pem --out report.json [--bronnen eu-fsf,uk-sanctions,ofac-sdn,us-csl] [--ledger history/ledger.jsonl]
+node src/cli.mjs verify --report report.json --pub keys/muqarin-public.pem --claims claims.json [--expect-bronnen eu-fsf,uk-sanctions,ofac-sdn,us-csl]
+npm test           # 568 tests, including random and metamorphic ones (one is skipped on Windows: it needs real file modes)
+npm run mutatie    # plants 548 faults in the code, the counter and the measuring tool; the tests must catch every one
 ```
 
 A claim may carry `birthYear` and `country` (entities only). A valid hint never changes the outcome; each candidate just gets a `komt_overeen`, `wijkt_af` or `onbekend` hint so a reader can tell namesakes apart. An invalid hint (a year outside 1850 to 2100, a year written as text, an unknown country code) makes that one claim `ONMEETBAAR`, never green.
@@ -41,23 +41,24 @@ What `verify` proves, and what it does not. It checks the signature, that the re
 Fetching the lists (`feeder/`) and the local counter (`loket/`, loopback only) are the only parts that touch the network, kept apart from the checker in `src/`, which has none:
 
 ```
-node feeder/voeding.mjs --bron eu-fsf --out snapshots --history history --key keys/muqarin-private.pem   # likewise uk-sanctions, ofac-sdn, un-sc
+node feeder/voeding.mjs --bron eu-fsf --out snapshots --history history --key keys/muqarin-private.pem   # likewise uk-sanctions, ofac-sdn, us-csl, un-sc
 node tools/status.mjs --snapshots snapshots --history history --pub keys/muqarin-public.pem   # exit 1 when the feeding bot is not doing its job
 node loket/start.mjs --snapshots snapshots --pub keys/muqarin-public.pem --key keys/muqarin-private.pem --port 8744   # 127.0.0.1 only
 ```
 
 ## Lists
 
-Four lists can be fed. A claim about a company is compared with every list in the set it is asked for; the set is `eu-fsf,uk-sanctions,ofac-sdn` unless `--bronnen` (on `check`, `loket/start.mjs` and `tools/status.mjs`) says otherwise. A hit in any list is the answer. A list that is missing, stale or refused makes a clean answer `ONMEETBAAR`, never green, so while one list is down you ask for the others by name and the report says that only those were looked at.
+Five lists can be fed. A claim about a company is compared with every list in the set it is asked for; the set is `eu-fsf,uk-sanctions,ofac-sdn,us-csl` unless `--bronnen` (on `check`, `loket/start.mjs` and `tools/status.mjs`) says otherwise. A hit in any list is the answer. A list that is missing, stale or refused makes a clean answer `ONMEETBAAR`, never green, so while one list is down you ask for the others by name and the report says that only those were looked at.
 
 | Id | List | Terms, as we read them (details and dates in each signed manifest and in `docs/DESIGN.md`) | Default |
 |---|---|---|---|
 | `eu-fsf` | EU Financial Sanctions Files | Commission Decision 2011/833/EU: reuse allowed, source acknowledged, meaning not distorted | yes |
 | `uk-sanctions` | UK Sanctions List | Open Government Licence v3.0 | yes |
 | `ofac-sdn` | US Treasury OFAC SDN list | a US federal government work (no US copyright, our reading); no usage terms found on the OFAC pages we read | yes |
+| `us-csl` | US Consolidated Screening List (trade.gov): the export-control and sanctions lists of the Commerce, State and Treasury departments, without the SDN entries (those are `ofac-sdn`) | a US federal government work (no US copyright, our reading); the publisher's terms page could not be read (HTTP 403) | yes |
 | `un-sc` | UN Security Council consolidated list | the general UN site terms say personal, non-commercial use and no derivative works; no permission asked or given | no |
 
-The UN list is there for whoever has permission or takes that risk: it is not in the default set, and 988 of its 1007 entries (98 percent, found by UN reference number, list of 8 Nov 2026) are also in the UK list. The lists are the publishers' own and only the publisher's text is authentic; what you get here is a signed copy for comparison.
+The UN list is there for whoever has permission or takes that risk: it is not in the default set. It adds almost nothing: of its 1007 entries (list of 8 Nov 2026), 988 (98 percent) are also in the UK list by UN reference number, and 1002 have a name that is exactly the same, after our cleaning of names, as a name in the EU, UK or OFAC list; the other five are in those lists under a slightly different written form. A new UN listing usually appears on the UN list first and on the others days or weeks later (not measured by us). The lists are the publishers' own and only the publisher's text is authentic; what you get here is a signed copy for comparison.
 
 Design, threat model and what was found and fixed on the way: `docs/DESIGN.md`. Measured limits: `docs/KNOWN-LIMITS.md`.
 

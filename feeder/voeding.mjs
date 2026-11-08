@@ -10,8 +10,8 @@ import { gzipSync } from 'node:zlib';
 import { canonical } from '../src/canon.mjs';
 import { MIN_DEKKING, entityIndex } from '../src/check.mjs';
 import { loadSnapshot, sha256Hex } from '../src/snapshot.mjs';
-import { BRONNEN } from './bronnen.mjs';
-import { downloadXml } from './download.mjs';
+import { BRONNEN, downloadOpties } from './bronnen.mjs';
+import { downloadLijst } from './download.mjs';
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
@@ -62,7 +62,7 @@ function quarantine(reason, raw) {
 }
 
 try {
-  const raw = args['from-file'] ? readFileSync(args['from-file']) : await downloadXml({ url: B.url, allowedHost: B.hosts, allowedPathPrefix: B.pathPrefix, maxBytes: MAX_BYTES });
+  const raw = args['from-file'] ? readFileSync(args['from-file']) : await downloadLijst({ ...downloadOpties(B), maxBytes: MAX_BYTES });
   const { asOf, entries } = B.parse(raw.toString('utf8'));
   if (entries.length < floor) quarantine(`te weinig partijen: ${entries.length} < ${floor}`, raw);
   const livePath = join(outDir, SOURCE, 'manifest.json');

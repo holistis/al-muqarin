@@ -9,8 +9,8 @@ export const MAX_CLAIMS = 200;
 // The lists an entity claim can be compared with. A claim is checked against EVERY list in the set it is given, and a list that is
 // missing or refused makes that claim ONMEETBAAR unless another list found something worse. 'un-sc' is known but not in the default
 // set: the UN terms of use do not clearly allow this use (see docs/DESIGN.md), so whoever feeds it asks for it by name.
-export const ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'un-sc'];
-export const DEFAULT_ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn'];
+export const ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl', 'un-sc'];
+export const DEFAULT_ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl'];
 export const REQUIRED = { entity: DEFAULT_ENTITY_SOURCES, country: ['cahras'] };
 export const OUTCOMES = ['TREFFER', 'KANDIDAAT', 'ONMEETBAAR', 'GEEN_TREFFER_IN_LIJST'];
 const RANK = { TREFFER: 4, KANDIDAAT: 3, ONMEETBAAR: 2, GEEN_TREFFER_IN_LIJST: 1 };

@@ -18,13 +18,14 @@ One run per list. The address of each list is fixed in `feeder/bronnen.mjs`; the
 node feeder/voeding.mjs --bron eu-fsf       --out snapshots --history history --key keys/muqarin-private.pem
 node feeder/voeding.mjs --bron uk-sanctions --out snapshots --history history --key keys/muqarin-private.pem
 node feeder/voeding.mjs --bron ofac-sdn     --out snapshots --history history --key keys/muqarin-private.pem
+node feeder/voeding.mjs --bron us-csl       --out snapshots --history history --key keys/muqarin-private.pem
 # node feeder/voeding.mjs --bron un-sc ...   only if you decide to use the UN list (see the terms in README.md)
 ```
 
 A cron entry that runs them twice a day, one after the other, so one list that fails does not stop the others (put the lines in `/etc/cron.d/` with a user name after the time fields):
 
 ```
-17 5,17 * * * muqarin cd /opt/al-muqarin && for s in eu-fsf uk-sanctions ofac-sdn; do (date -u +\%FT\%TZ; node feeder/voeding.mjs --bron $s --out snapshots --history history --key keys/muqarin-private.pem; echo "$s exit=$?") >> logs/feeder.log 2>&1; done
+17 5,17 * * * muqarin cd /opt/al-muqarin && for s in eu-fsf uk-sanctions ofac-sdn us-csl; do (date -u +\%FT\%TZ; node feeder/voeding.mjs --bron $s --out snapshots --history history --key keys/muqarin-private.pem; echo "$s exit=$?") >> logs/feeder.log 2>&1; done
 7 * * * * muqarin cd /opt/al-muqarin && node tools/status.mjs --snapshots snapshots --history history --pub keys/muqarin-public.pem --out logs/status.json; true
 ```
 
@@ -34,12 +35,12 @@ Exit codes of the feeder: `0` a new signed list is live; `2` nothing was fetched
 
 `node tools/status.mjs --snapshots snapshots --history history --pub keys/muqarin-public.pem` prints one JSON object and exits `0` when every list in the set is fine, `1` when not. The reasons are named per list, for example `eu-fsf:momentopname_bron_niet_aanwezig` (no signed list yet), `uk-sanctions:momentopname_verouderd` (older than 30 hours), `ofac-sdn:quarantaine_na_laatste_goede_run_1`. Treat a missing or old status file as red too: silence is never green. Look at it from outside the machine as well; a machine that is down cannot tell you so.
 
-When a publisher's service is down (this happens: the EU file service returned HTTP 500 on every file in November 2026), the feeder keeps trying at the next run and the status stays red for that list. Do not copy a list in by hand: the signed time of fetching would then say something that is not true. Ask for the other lists by name in the meantime (`--bronnen uk-sanctions,ofac-sdn` on `check` and on the counter); the report then says that only those lists were looked at.
+When a publisher's service is down (this happens: the EU file service returned HTTP 500 on every file in November 2026), the feeder keeps trying at the next run and the status stays red for that list. Do not copy a list in by hand: the signed time of fetching would then say something that is not true. Ask for the other lists by name in the meantime (`--bronnen uk-sanctions,ofac-sdn,us-csl` on `check` and on the counter); the report then says that only those lists were looked at.
 
 ## The counter
 
 ```
-node loket/start.mjs --snapshots snapshots --pub keys/muqarin-public.pem --key keys/muqarin-private.pem --port 8744 --ledger history/ledger.jsonl [--bronnen uk-sanctions,ofac-sdn]
+node loket/start.mjs --snapshots snapshots --pub keys/muqarin-public.pem --key keys/muqarin-private.pem --port 8744 --ledger history/ledger.jsonl [--bronnen uk-sanctions,ofac-sdn,us-csl]
 ```
 
 It listens on 127.0.0.1 only and has no login, payment or encryption: put those in the layer in front of it. Details: `docs/DESIGN.md`.
