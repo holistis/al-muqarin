@@ -1,49 +1,12 @@
 // Pure parser for the EU Financial Sanctions Files XML (v1.1). No network, no filesystem.
-// Self-check: the number of parsed entities must equal the number of opening tags, or we throw.
-const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-const decode = (s) => s.replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g, (_, g) => {
-  if (g[0] !== '#') return NAMED[g];
-  return String.fromCodePoint(g[1] === 'x' || g[1] === 'X' ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10));
-});
-
-const OPEN = '<sanctionEntity';
-const CLOSE = '</sanctionEntity>';
-
-// Index of the next opening tag `<sanctionEntity` (not `<sanctionEntityX`), or -1.
-function volgendeOpen(xml, vanaf) {
-  let i = vanaf;
-  for (;;) {
-    i = xml.indexOf(OPEN, i);
-    if (i < 0) return -1;
-    if (!/[A-Za-z0-9_]/.test(xml[i + OPEN.length] ?? '')) return i;
-    i += 1;
-  }
-}
-
-// Reads the entities one after another. Every search moves forward only, so a hostile file with thousands of unclosed tags is
-// refused at the first one instead of making the parser rescan the rest of the file for each of them.
-function* entiteiten(xml) {
-  let pos = 0;
-  for (;;) {
-    const open = volgendeOpen(xml, pos);
-    if (open < 0) return;
-    const tagEinde = xml.indexOf('>', open);
-    if (tagEinde < 0) throw new Error('entiteit niet gesloten');
-    if (xml[tagEinde - 1] === '/') throw new Error('lege entiteit (zelfsluitende tag)');
-    const sluit = xml.indexOf(CLOSE, tagEinde + 1);
-    if (sluit < 0) throw new Error('entiteit niet gesloten');
-    const volgende = volgendeOpen(xml, tagEinde + 1);
-    if (volgende >= 0 && volgende < sluit) throw new Error('entiteit niet gesloten voor de volgende begint');
-    yield [xml.slice(open + OPEN.length, tagEinde), xml.slice(tagEinde + 1, sluit)];
-    pos = sluit + CLOSE.length;
-  }
-}
+// Self-check: a record that is not closed, closed too late or empty makes the parser throw (see records.mjs).
+import { decode, eindeControle, records } from './records.mjs';
 
 export function parseEuFsf(xml) {
   const gen = /<export\b[^>]*\bgenerationDate="(\d{4}-\d{2}-\d{2})T/.exec(xml);
   if (!gen) throw new Error('generationDate ontbreekt');
   const entries = [];
-  for (const m of entiteiten(xml)) {
+  for (const m of records(xml, 'sanctionEntity')) {
     const id = /\beuReferenceNumber="([^"]+)"/.exec(m[0])?.[1] || /\blogicalId="([^"]+)"/.exec(m[0])?.[1];
     if (!id) throw new Error('entiteit zonder id');
     const names = new Set();
@@ -72,5 +35,6 @@ export function parseEuFsf(xml) {
       ...(countries.size ? { landen: [...countries].sort() } : {}),
     });
   }
+  eindeControle(xml, '</export>');
   return { asOf: gen[1], entries };
 }

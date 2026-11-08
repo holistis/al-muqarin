@@ -17,7 +17,9 @@ const root = () => { const r = tmpRoot(); roots.push(r); return r; };
 after(() => roots.forEach(cleanup));
 
 const ent = (value, id = 'c1') => ({ id, type: 'entity', value });
-const run = (r, claims, extra = {}) => runCheck({ claims, snapshotDir: r, pubKeyPem: K.pub, now: NOW, ...extra });
+// The fixtures of these tests hold one entity list (eu-fsf) and the country list; the set of lists is a plain argument.
+const EU = { entity: ['eu-fsf'], country: ['cahras'] };
+const run = (r, claims, extra = {}) => runCheck({ claims, snapshotDir: r, pubKeyPem: K.pub, now: NOW, required: EU, ...extra });
 const first = (rep) => rep.resultaten[0];
 const healthy = () => { const r = root(); writeSnapshot(r, 'eu-fsf', ENTITIES, K.priv); writeSnapshot(r, 'cahras', COUNTRIES, K.priv, { manifest: { minEntries: 1 } }); return r; };
 

@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-// Usage: node tools/zelfmeting.mjs --snapshots snapshots --pub keys/muqarin-public.pem [--n 300] [--seed 1] [--out raw/zelfmeting.json]
+// Usage: node tools/zelfmeting.mjs --snapshots snapshots --pub keys/muqarin-public.pem [--bron eu-fsf] [--n 300] [--seed 1] [--out raw/zelfmeting.json]
 import { readFileSync, writeFileSync } from 'node:fs';
-import { collectHits, entityIndex } from '../src/check.mjs';
+import { ENTITY_SOURCES, collectHits, entityIndex } from '../src/check.mjs';
 import { loadSnapshot } from '../src/snapshot.mjs';
 import { measureFalseAlarms, measureLeaveOneOut, measureMutations, measureOnderscheid, measureTriage } from './zelfmeting-lib.mjs';
 
 const a = {};
 for (let i = 2; i < process.argv.length; i += 2) a[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
 const n = Number(a.n ?? 300), seed = Number(a.seed ?? 1);
-const snap = loadSnapshot({ dir: a.snapshots, source: 'eu-fsf', pubKeyPem: readFileSync(a.pub, 'utf8'), now: new Date(), maxAgeDays: 8 });
+const bron = a.bron ?? 'eu-fsf';
+if (!ENTITY_SOURCES.includes(bron)) { console.error(`onbekende bron: ${bron}`); process.exit(2); }
+const snap = loadSnapshot({ dir: a.snapshots, source: bron, pubKeyPem: readFileSync(a.pub, 'utf8'), now: new Date(), maxAgeDays: 8 });
 if (!snap.ok) { console.error('snapshot niet bruikbaar:', snap.reason); process.exit(2); }
 entityIndex(snap);
 
@@ -20,7 +22,7 @@ const MIX_L = ['Hassan','Ali','Khan','Ahmed','Rahman','Ibrahim','Hussain','Petro
 const combos = (f, l) => f.flatMap((x) => l.map((y) => `${x} ${y}`));
 
 const report = {
-  gemeten_op: new Date().toISOString(), seed, n,
+  gemeten_op: new Date().toISOString(), bron_id: bron, seed, n,
   bron: { asOf: snap.manifest.asOf, partijen: snap.manifest.entryCount, namen_in_index: snap.index.length, overgeslagen_niet_latijns: snap.skipped },
   mutaties: measureMutations({ snap, seed, n }),
   alias_leave_one_out: measureLeaveOneOut({ snap, seed, n: Math.max(n, 800) }),

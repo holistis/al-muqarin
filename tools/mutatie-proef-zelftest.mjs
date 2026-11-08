@@ -20,6 +20,6 @@ proef('fout die niemand ziet', ['src/check.mjs', 'export const VERSION', 'export
 proef('tekst niet gevonden', ['src/check.mjs', 'deze tekst staat er niet', 'x'], 'deze tekst staat er niet', 1, 'NIET GEVONDEN');
 proef('alleen een syntaxfout', ['src/check.mjs', 'export const VERSION', 'export cnst VERSION'], 'export const VERSION', 1, 'ONGELDIGE FOUT');
 // A fault that makes the code loop for ever must not hang the proof: the run is stopped at the time limit and counts as caught, named apart.
-proef('fout waardoor de tests vastlopen', ['src/adapters/eu-fsf.mjs', "if (sluit < 0) throw new Error('entiteit niet gesloten');", ''], "if (sluit < 0) throw new Error('entiteit niet gesloten');", 0, 'tests liepen vast', { MUTANT_TIJDSLIMIET_MS: '40000' });
+proef('fout waardoor de tests vastlopen', ['src/adapters/records.mjs', "if (sluit < 0) throw new Error('entiteit niet gesloten');", ''], "if (sluit < 0) throw new Error('entiteit niet gesloten');", 0, 'tests liepen vast', { MUTANT_TIJDSLIMIET_MS: '40000' });
 rmSync(dir, { recursive: true, force: true });
 process.exitCode = fout ? 1 : 0;

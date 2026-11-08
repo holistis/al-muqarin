@@ -1,30 +1,38 @@
 #!/usr/bin/env node
 // The ONLY part of Al-Muqarin that touches the network. The checker itself never does.
-// Fetches the EU sanctions XML from one fixed host, parses it, runs sanity gates, signs a snapshot,
+// Fetches one sanctions list (--bron, see feeder/bronnen.mjs) from its one fixed host, parses it, runs sanity gates, signs a snapshot,
 // verifies it with the same loader the checker uses, keeps a gzipped raw copy and a ledger line, then swaps atomically.
 // Anything suspicious goes to quarantine and exits 3; the live snapshot is left untouched.
 import { createPrivateKey, createPublicKey, sign } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { parseEuFsf } from '../src/adapters/eu-fsf.mjs';
 import { canonical } from '../src/canon.mjs';
 import { MIN_DEKKING, entityIndex } from '../src/check.mjs';
 import { loadSnapshot, sha256Hex } from '../src/snapshot.mjs';
-import { downloadXml } from './download.mjs';
+import { BRONNEN, downloadOpties } from './bronnen.mjs';
+import { downloadLijst } from './download.mjs';
 
-const SOURCE = 'eu-fsf';
-const URL_FULL = 'https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw';
-const HOST = 'webgate.ec.europa.eu';
 const MAX_BYTES = 100 * 1024 * 1024;
-const LICENSE = 'EU Financial Sanctions Files, DG FISMA. Reuse under Commission Decision 2011/833/EU (OJ L 330, 14.12.2011): source acknowledged, meaning not distorted, no liability of the Commission. Terms read 2026-11-07 from the original text; consolidated version and any notice on the FSF site itself not checked. Only the Official Journal is authentic.';
 
+// Unknown, repeated or valueless options are refused: a typo like --flor must never be ignored silently, and there is no option for an address.
+const TOEGESTAAN = ['bron', 'out', 'history', 'key', 'from-file', 'floor', 'accepteer-verschil', 'now'];
 const args = {};
-for (let i = 2; i < process.argv.length; i += 2) args[process.argv[i].replace(/^--/, '')] = process.argv[i + 1];
+for (let i = 2; i < process.argv.length; i += 2) {
+  const k = process.argv[i].replace(/^--/, '');
+  if (!process.argv[i].startsWith('--') || !TOEGESTAAN.includes(k) || process.argv[i + 1] === undefined || Object.hasOwn(args, k)) {
+    console.error(`gebruik: --bron ${Object.keys(BRONNEN).join('|')} --out D --history D --key K [--from-file F] [--floor N] [--accepteer-verschil REDEN] [--now ISO]`);
+    process.exit(2);
+  }
+  args[k] = process.argv[i + 1];
+}
 const need = (k) => { if (!args[k]) { console.error(`ontbreekt: --${k}`); process.exit(2); } return args[k]; };
+const SOURCE = need('bron');
+if (!Object.hasOwn(BRONNEN, SOURCE)) { console.error(`onbekende bron: ${SOURCE} (kies uit ${Object.keys(BRONNEN).join(', ')})`); process.exit(2); }
+const B = BRONNEN[SOURCE];
 const outDir = need('out'), historyDir = need('history');
 const privPem = readFileSync(need('key'), 'utf8');
-const floor = args.floor ? Number(args.floor) : 3000;
+const floor = args.floor ? Number(args.floor) : B.floor;
 // A deliberate, written-down exception for a run whose list changed a lot on purpose (for instance the EU renumbers its entries).
 const toegestaan = args['accepteer-verschil'] ? String(args['accepteer-verschil']).slice(0, 200) : null;
 const now = args.now ? new Date(args.now) : new Date();
@@ -45,7 +53,7 @@ function vorigeRuns(historyDir) {
 }
 
 function quarantine(reason, raw) {
-  const q = join(historyDir, 'quarantine', now.toISOString().replace(/[:.]/g, '-'));
+  const q = join(historyDir, 'quarantine', `${now.toISOString().replace(/[:.]/g, '-')}--${SOURCE}`);
   mkdirSync(q, { recursive: true });
   writeFileSync(join(q, 'reden.txt'), reason);
   if (raw) writeFileSync(join(q, 'raw.xml.gz'), gzipSync(raw));
@@ -54,8 +62,8 @@ function quarantine(reason, raw) {
 }
 
 try {
-  const raw = args['from-file'] ? readFileSync(args['from-file']) : await downloadXml({ url: URL_FULL, allowedHost: HOST, maxBytes: MAX_BYTES });
-  const { asOf, entries } = parseEuFsf(raw.toString('utf8'));
+  const raw = args['from-file'] ? readFileSync(args['from-file']) : await downloadLijst({ ...downloadOpties(B), maxBytes: MAX_BYTES });
+  const { asOf, entries } = B.parse(raw.toString('utf8'));
   if (entries.length < floor) quarantine(`te weinig partijen: ${entries.length} < ${floor}`, raw);
   const livePath = join(outDir, SOURCE, 'manifest.json');
   if (existsSync(livePath)) {
@@ -81,7 +89,7 @@ try {
 
   const listBuf = Buffer.from(JSON.stringify({ entries }));
   const manifest = {
-    schema: 1, source: SOURCE, sourceUrl: URL_FULL.split('?')[0], license: LICENSE, asOf, fetchedAt: now.toISOString(),
+    schema: 1, source: SOURCE, sourceUrl: B.url.split('?')[0], license: B.license, asOf, fetchedAt: now.toISOString(),
     sha256: sha256Hex(listBuf), entryCount: entries.length, minEntries: floor,
     volgnummer: eerder.length + 1, vorige_manifest_sha256: eerder.length ? eerder[eerder.length - 1].manifest_sha256 : null,
   };

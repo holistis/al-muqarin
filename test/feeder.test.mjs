@@ -9,7 +9,7 @@ import { runCheck } from '../src/check.mjs';
 import { loadSnapshot } from '../src/snapshot.mjs';
 import { cleanup, keypair, tmpRoot } from './fixture.mjs';
 
-const FEEDER = new URL('../feeder/fetch-eu-fsf.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const FEEDER = new URL('../feeder/voeding.mjs', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const root = tmpRoot();
 after(() => cleanup(root));
 const K = keypair();
@@ -18,7 +18,7 @@ const out = join(root, 'snaps'), hist = join(root, 'hist');
 const NOW = '2026-11-06T12:00:00Z';
 const xml = (n, gen = '2026-11-05') => `<?xml version="1.0"?><export generationDate="${gen}T10:00:00.000+01:00">` +
   Array.from({ length: n }, (_, i) => `<sanctionEntity euReferenceNumber="EU.${i}" logicalId="${i}"><nameAlias wholeName="Name Number ${i} &amp; Co" logicalId="${i}"/></sanctionEntity>`).join('') + '</export>';
-const feed = (file, extra = []) => spawnSync('node', [FEEDER, '--out', out, '--history', hist, '--key', keyFile, '--from-file', file, '--floor', '5', '--now', NOW, ...extra], { encoding: 'utf8' });
+const feed = (file, extra = []) => spawnSync('node', [FEEDER, '--bron', 'eu-fsf', '--out', out, '--history', hist, '--key', keyFile, '--from-file', file, '--floor', '5', '--now', NOW, ...extra], { encoding: 'utf8' });
 const file = (name, content) => { const p = join(root, name); writeFileSync(p, content); return p; };
 const liveCount = () => JSON.parse(readFileSync(join(out, 'eu-fsf', 'manifest.json'), 'utf8')).entryCount;
 
@@ -87,7 +87,7 @@ describe('feeder', () => {
 
 describe('feeder history keeps big files once', () => {
   const out2 = join(root, 'snaps2'), hist2 = join(root, 'hist2');
-  const feed2 = (f, now = NOW) => spawnSync('node', [FEEDER, '--out', out2, '--history', hist2, '--key', keyFile, '--from-file', f, '--floor', '5', '--now', now], { encoding: 'utf8' });
+  const feed2 = (f, now = NOW) => spawnSync('node', [FEEDER, '--bron', 'eu-fsf', '--out', out2, '--history', hist2, '--key', keyFile, '--from-file', f, '--floor', '5', '--now', now], { encoding: 'utf8' });
   const store = () => join(hist2, '_inhoud');
   const sha = (b) => createHash('sha256').update(b).digest('hex');
   const runs = () => readdirSync(join(hist2, 'eu-fsf'));

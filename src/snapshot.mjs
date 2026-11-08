@@ -96,7 +96,7 @@ export function loadSnapshot({ dir, source, pubKeyPem, now, maxAgeDays, maxListA
     if (ids.has(e.id)) return fail('regel_dubbel');
     ids.add(e.id);
     if (e.code !== undefined && typeof e.code !== 'string') return fail('regel_vorm');
-    if (e.soort !== undefined && !['persoon', 'onderneming', 'onbekend'].includes(e.soort)) return fail('regel_vorm');
+    if (e.soort !== undefined && !['persoon', 'onderneming', 'voertuig', 'onbekend'].includes(e.soort)) return fail('regel_vorm');
     if (e.jaren !== undefined && (!Array.isArray(e.jaren) || e.jaren.length > 50 || e.jaren.some((y) => !Number.isInteger(y) || y < 1800 || y > 2200))) return fail('regel_vorm');
     if (e.landen !== undefined && (!Array.isArray(e.landen) || e.landen.length > 100 || e.landen.some((c) => typeof c !== 'string' || !/^[A-Z]{2}$/.test(c)))) return fail('regel_vorm');
     if (e.ongeveer !== undefined && typeof e.ongeveer !== 'boolean') return fail('regel_vorm');
