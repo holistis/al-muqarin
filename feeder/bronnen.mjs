@@ -45,13 +45,14 @@ export const BRONNEN = {
     parse: parseUsCsl,
     license: 'Consolidated Screening List, US Department of Commerce (International Trade Administration), put together from export-control and sanctions lists of the Commerce, State and Treasury departments. A US federal government work; works of the US federal government carry no US copyright (17 U.S.C. 105; our reading, not a statement by the publishers). The page of the publisher that would state usage terms (data.commerce.gov) answered HTTP 403 and could not be read on 2026-11-08, so no usage terms were read. The SDN entries of the file are left out here, because the OFAC list is its own source. An export-control listing is not a sanction in every case; the lists inside the file say which restriction applies. Only the publishers\' own texts are authentic.',
   },
-  // Not part of the default set (see ENTITY_SOURCES): the UN terms are not clear for this use.
+  // Not part of the default set (see ENTITY_SOURCES): permission is clear (see the license below), but it adds almost nothing
+  // over the four default lists (measured 8 Nov 2026, see docs/DESIGN.md), so whoever wants it anyway asks for it by name.
   'un-sc': {
     url: 'https://scsanctions.un.org/resources/xml/en/consolidated.xml',
     hosts: ['unsolprodfiles.blob.core.windows.net'],
     pathPrefix: '/publiclegacyxmlfiles/',
     floor: 700,
     parse: parseUnSc,
-    license: 'United Nations Security Council Consolidated List. The general UN website terms (un.org/en/about-us/terms-of-use, read 2026-11-08) allow downloading and copying for personal, non-commercial use without any right to resell or redistribute, and do not allow adapting or compiling derivative works; they add that more specific restrictions may apply to specific material. The consolidated list pages read carry no more specific terms (not checked in full). No permission from the UN has been asked or given. Use of this source is the operator\'s own responsibility.',
+    license: 'United Nations Security Council Consolidated List. Permission for this use was asked on 2026-11-08 and granted by the United Nations Security Council Sanctions Lists Team on 2026-11-10, by email: "The Consolidated List is free to use for any legal purpose; we request a courtesy attribution of the data." This notice, the credit in README.md and docs/DESIGN.md, and the signed manifest are that attribution; the tool fetches the file, keeps a signed copy for comparison, and does not republish the list or change its content. The general UN website terms (un.org/en/about-us/terms-of-use, read 2026-11-08) otherwise speak of personal, non-commercial use and no derivative works, but this specific written permission is what governs this use.',
   },
 };

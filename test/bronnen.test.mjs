@@ -65,8 +65,9 @@ describe('the lists we know', () => {
     assert.match(BRONNEN['us-csl'].license, /17 U\.S\.C\. 105/);
     assert.match(BRONNEN['us-csl'].license, /HTTP 403 and could not be read on 20\d\d-\d\d-\d\d, so no usage terms were read/);
     assert.match(BRONNEN['us-csl'].license, /SDN entries of the file are left out/);
+    assert.match(BRONNEN['un-sc'].license, /granted by the United Nations Security Council Sanctions Lists Team on 2026-11-10/);
+    assert.match(BRONNEN['un-sc'].license, /courtesy attribution/);
     assert.match(BRONNEN['un-sc'].license, /personal, non-commercial use/);
-    assert.match(BRONNEN['un-sc'].license, /No permission from the UN has been asked or given/);
   });
 });
 

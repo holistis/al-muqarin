@@ -19,7 +19,7 @@ node feeder/voeding.mjs --bron eu-fsf       --out snapshots --history history --
 node feeder/voeding.mjs --bron uk-sanctions --out snapshots --history history --key keys/muqarin-private.pem
 node feeder/voeding.mjs --bron ofac-sdn     --out snapshots --history history --key keys/muqarin-private.pem
 node feeder/voeding.mjs --bron us-csl       --out snapshots --history history --key keys/muqarin-private.pem
-# node feeder/voeding.mjs --bron un-sc ...   only if you decide to use the UN list (see the terms in README.md)
+# node feeder/voeding.mjs --bron un-sc ...   opt-in: permission is clear, it just rarely adds a hit beyond the four above (see docs/DESIGN.md)
 ```
 
 A cron entry that runs them twice a day, one after the other, so one list that fails does not stop the others (put the lines in `/etc/cron.d/` with a user name after the time fields):
