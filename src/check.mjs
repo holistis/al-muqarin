@@ -8,7 +8,8 @@ export const VERSION = '0.0.1';
 export const MAX_CLAIMS = 200;
 // The lists an entity claim can be compared with. A claim is checked against EVERY list in the set it is given, and a list that is
 // missing or refused makes that claim ONMEETBAAR unless another list found something worse. 'un-sc' is known but not in the default
-// set: the UN terms of use do not clearly allow this use (see docs/DESIGN.md), so whoever feeds it asks for it by name.
+// set: permission for this use is clear (see docs/DESIGN.md and feeder/bronnen.mjs), but it adds almost nothing over the four
+// default lists (measured 8 Nov 2026), so whoever feeds it asks for it by name.
 export const ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl', 'un-sc'];
 export const DEFAULT_ENTITY_SOURCES = ['eu-fsf', 'uk-sanctions', 'ofac-sdn', 'us-csl'];
 export const REQUIRED = { entity: DEFAULT_ENTITY_SOURCES, country: ['cahras'] };
